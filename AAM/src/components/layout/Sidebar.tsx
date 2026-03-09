@@ -16,6 +16,7 @@ import {
   Boxes,
   ShoppingCart,
   ClipboardCheck,
+  X,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -38,7 +39,11 @@ const inventoryNavigation = [
   { name: 'Cycle Counts', href: '/inventory/cycle-counts', icon: ClipboardCheck },
 ]
 
-export default function Sidebar() {
+interface SidebarProps {
+  onClose?: () => void
+}
+
+export default function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -49,17 +54,33 @@ export default function Sidebar() {
     router.refresh()
   }
 
+  function handleNavClick() {
+    onClose?.()
+  }
+
   return (
     <div className="flex h-full w-64 flex-col bg-slate-900">
       {/* Logo */}
-      <div className="flex h-16 items-center gap-3 border-b border-slate-700 px-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
-          <Settings className="h-5 w-5 text-white" />
+      <div className="flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-700 px-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
+            <Settings className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-white">Asset Manager</p>
+            <p className="text-xs text-slate-400">Service & Maintenance</p>
+          </div>
         </div>
-        <div>
-          <p className="text-sm font-semibold text-white">Asset Manager</p>
-          <p className="text-xs text-slate-400">Service & Maintenance</p>
-        </div>
+        {/* Close button — mobile only */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -75,6 +96,7 @@ export default function Sidebar() {
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={handleNavClick}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                   isActive
@@ -102,6 +124,7 @@ export default function Sidebar() {
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={handleNavClick}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                   isActive

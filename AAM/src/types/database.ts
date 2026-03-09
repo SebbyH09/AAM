@@ -69,6 +69,11 @@ export interface Database {
         Insert: Omit<CycleCount, 'id' | 'created_at'>
         Update: Partial<Omit<CycleCount, 'id' | 'created_at'>>
       }
+      alternate_inventory_items: {
+        Row: AlternateInventoryItem
+        Insert: Omit<AlternateInventoryItem, 'id' | 'created_at'>
+        Update: Partial<Omit<AlternateInventoryItem, 'id' | 'created_at'>>
+      }
     }
   }
 }
@@ -209,6 +214,18 @@ export interface NotificationLog {
 }
 
 // ─── Inventory Manager Types ────────────────────────────────────────
+
+export interface AlternateInventoryItem {
+  id: string
+  item_id: string
+  alternate_item_id: string
+  notes: string | null
+  created_at: string
+}
+
+export interface AlternateInventoryItemWithItem extends AlternateInventoryItem {
+  inventory_items?: InventoryItem
+}
 
 export interface InventoryItem {
   id: string

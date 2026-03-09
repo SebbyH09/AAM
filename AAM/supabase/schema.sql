@@ -212,3 +212,108 @@ insert into notification_rules (name, type, days_before, email_to) values
   ('Contract Expiry 7 Days', 'contract_expiry', 7, array['admin@yourdomain.com']),
   ('Maintenance Due 7 Days', 'maintenance_due', 7, array['admin@yourdomain.com']),
   ('Maintenance Due Today', 'maintenance_due', 0, array['admin@yourdomain.com']);
+
+-- ─── Inventory Manager Tables ────────────────────────────────────────
+
+create table inventory_items (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,
+  sku text,
+  category text not null check (category in (
+    'Reagents', 'Filters', 'PPE', 'Cleaning Supplies',
+    'Office Supplies', 'Lab Consumables', 'Electrical', 'Mechanical Parts', 'Other'
+  )),
+  description text,
+  unit text not null,
+  quantity_on_hand integer not null default 0,
+  reorder_point integer not null default 0,
+  reorder_quantity integer not null default 0,
+  unit_cost numeric(12,2),
+  location text,
+  vendor text,
+  last_counted_date date,
+  next_count_date date,
+  is_active boolean default true,
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table inventory_orders (
+  id uuid primary key default uuid_generate_v4(),
+  order_number text,
+  vendor text not null,
+  status text not null default 'draft' check (status in (
+    'draft', 'submitted', 'approved', 'ordered', 'shipped', 'received', 'cancelled'
+  )),
+  order_date date not null,
+  expected_date date,
+  received_date date,
+  total_cost numeric(12,2),
+  notes text,
+  ordered_by text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table inventory_order_items (
+  id uuid primary key default uuid_generate_v4(),
+  order_id uuid references inventory_orders(id) on delete cascade,
+  item_id uuid references inventory_items(id) on delete cascade,
+  quantity integer not null,
+  unit_cost numeric(12,2),
+  total_cost numeric(12,2),
+  received_quantity integer,
+  created_at timestamptz default now()
+);
+
+create table cycle_counts (
+  id uuid primary key default uuid_generate_v4(),
+  item_id uuid references inventory_items(id) on delete cascade,
+  counted_by text not null,
+  count_date date not null,
+  expected_quantity integer not null,
+  actual_quantity integer not null,
+  variance integer not null,
+  notes text,
+  status text not null default 'pending' check (status in ('pending', 'completed', 'reviewed')),
+  created_at timestamptz default now()
+);
+
+-- Alternate/substitute items — links two inventory items as interchangeable
+create table alternate_inventory_items (
+  id uuid primary key default uuid_generate_v4(),
+  item_id uuid not null references inventory_items(id) on delete cascade,
+  alternate_item_id uuid not null references inventory_items(id) on delete cascade,
+  notes text,
+  created_at timestamptz default now(),
+  unique(item_id, alternate_item_id),
+  check (item_id <> alternate_item_id)
+);
+
+-- Indexes
+create index idx_inventory_items_category on inventory_items(category);
+create index idx_inventory_items_is_active on inventory_items(is_active);
+create index idx_inventory_order_items_order_id on inventory_order_items(order_id);
+create index idx_inventory_order_items_item_id on inventory_order_items(item_id);
+create index idx_cycle_counts_item_id on cycle_counts(item_id);
+create index idx_alternate_inventory_items_item_id on alternate_inventory_items(item_id);
+
+-- Updated_at triggers
+create trigger inventory_items_updated_at before update on inventory_items
+  for each row execute function update_updated_at();
+create trigger inventory_orders_updated_at before update on inventory_orders
+  for each row execute function update_updated_at();
+
+-- RLS
+alter table inventory_items enable row level security;
+alter table inventory_orders enable row level security;
+alter table inventory_order_items enable row level security;
+alter table cycle_counts enable row level security;
+alter table alternate_inventory_items enable row level security;
+
+create policy "Allow all for authenticated" on inventory_items for all using (true);
+create policy "Allow all for authenticated" on inventory_orders for all using (true);
+create policy "Allow all for authenticated" on inventory_order_items for all using (true);
+create policy "Allow all for authenticated" on cycle_counts for all using (true);
+create policy "Allow all for authenticated" on alternate_inventory_items for all using (true);

@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor } from '@/lib/utils'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Edit, ClipboardCheck, ShoppingCart, TrendingDown, MapPin, Package } from 'lucide-react'
+import { Edit, ClipboardCheck, ShoppingCart, Package, ArrowLeftRight } from 'lucide-react'
 import DeleteInventoryItemButton from './DeleteInventoryItemButton'
 
 export const dynamic = 'force-dynamic'
@@ -21,6 +21,7 @@ export default async function InventoryItemDetailPage({ params }: PageProps) {
     { data: item },
     { data: cycleCounts },
     { data: orderItems },
+    alternatesResult,
   ] = await Promise.all([
     supabase.from('inventory_items').select('*').eq('id', id).single(),
     supabase.from('cycle_counts')
@@ -33,9 +34,17 @@ export default async function InventoryItemDetailPage({ params }: PageProps) {
       .eq('item_id', id)
       .order('created_at', { ascending: false })
       .limit(10),
+    supabase
+      .from('alternate_inventory_items')
+      .select('id, alternate_item_id, notes, inventory_items!alternate_item_id(id, name, sku, category, quantity_on_hand, unit, reorder_point)')
+      .eq('item_id', id)
+      .then((r) => r)
+      .catch(() => ({ data: [] })),
   ])
 
   if (!item) notFound()
+
+  const alternates: any[] = (alternatesResult as any)?.data ?? []
 
   const isLow = item.quantity_on_hand <= item.reorder_point
   const isOut = item.quantity_on_hand === 0
@@ -55,16 +64,16 @@ export default async function InventoryItemDetailPage({ params }: PageProps) {
               className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               <Edit className="h-4 w-4" />
-              Edit
+              <span className="hidden sm:inline">Edit</span>
             </Link>
             <DeleteInventoryItemButton itemId={id} itemName={item.name} />
           </div>
         }
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6">
         {/* Info Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <p className="text-xs text-gray-500 uppercase tracking-wide">Stock Status</p>
             <Badge className={`mt-1 ${stockColor}`}>{stockLabel}</Badge>
@@ -214,6 +223,64 @@ export default async function InventoryItemDetailPage({ params }: PageProps) {
                 <p className="px-6 py-4 text-sm text-gray-400">No orders for this item.</p>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Alternate / Substitute Items */}
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+            <div className="flex items-center gap-2">
+              <ArrowLeftRight className="h-5 w-5 text-purple-600" />
+              <h2 className="font-semibold text-gray-900">Alternate / Substitute Items</h2>
+            </div>
+            <Link
+              href={`/inventory/items/${id}/edit`}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              Manage
+            </Link>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {alternates.length > 0 ? (
+              alternates.map((alt: any) => {
+                const altItem = alt.inventory_items
+                if (!altItem) return null
+                const altIsLow = altItem.quantity_on_hand <= altItem.reorder_point
+                const altIsOut = altItem.quantity_on_hand === 0
+                const altBadge = altIsOut
+                  ? { label: 'Out of stock', color: 'bg-red-100 text-red-800' }
+                  : altIsLow
+                  ? { label: 'Low stock', color: 'bg-orange-100 text-orange-800' }
+                  : { label: 'In stock', color: 'bg-green-100 text-green-800' }
+                return (
+                  <Link
+                    key={alt.id}
+                    href={`/inventory/items/${altItem.id}`}
+                    className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{altItem.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {altItem.sku && <>{altItem.sku} · </>}
+                        {altItem.quantity_on_hand} {altItem.unit} on hand
+                        {alt.notes && <> · <span className="italic">{alt.notes}</span></>}
+                      </p>
+                    </div>
+                    <Badge className={altBadge.color}>{altBadge.label}</Badge>
+                  </Link>
+                )
+              })
+            ) : (
+              <div className="flex items-center justify-between px-6 py-4">
+                <p className="text-sm text-gray-400">No alternate items linked.</p>
+                <Link
+                  href={`/inventory/items/${id}/edit`}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Add alternates →
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>
