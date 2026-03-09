@@ -1,6 +1,14 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { addDays, format } from 'date-fns'
+
+function isAuthorized(request: NextRequest): boolean {
+  const cronSecret = process.env.CRON_SECRET
+  // In development or if CRON_SECRET is not set, allow all requests
+  if (!cronSecret) return true
+  const authHeader = request.headers.get('authorization')
+  return authHeader === `Bearer ${cronSecret}`
+}
 
 // Email sending via Resend (or fallback to console log in dev)
 async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
@@ -109,7 +117,11 @@ function buildMaintenanceEmail(plan: any, daysLeft: number): string {
   `
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const supabase = createServiceClient()
   const today = new Date()
   let notificationsSent = 0
@@ -213,7 +225,7 @@ export async function POST() {
   })
 }
 
-export async function GET() {
-  // Allow GET for cron job compatibility
-  return POST()
+export async function GET(request: NextRequest) {
+  // Allow GET for Vercel Cron job compatibility
+  return POST(request)
 }
