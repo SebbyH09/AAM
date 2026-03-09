@@ -12,7 +12,10 @@ import {
   Bell,
   Settings,
   Package,
+  LogOut,
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 const navigation = [
@@ -27,6 +30,14 @@ const navigation = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   return (
     <div className="flex h-full w-64 flex-col bg-slate-900">
@@ -68,7 +79,14 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className="border-t border-slate-700 p-4">
-        <p className="text-xs text-slate-500">Asset Manager v1.0</p>
+        <button
+          onClick={handleSignOut}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
+        >
+          <LogOut className="h-5 w-5 flex-shrink-0" />
+          Sign out
+        </button>
+        <p className="mt-2 text-xs text-slate-500">Asset Manager v1.0</p>
       </div>
     </div>
   )
