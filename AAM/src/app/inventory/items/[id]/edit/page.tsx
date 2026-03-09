@@ -21,11 +21,20 @@ export default async function EditInventoryItemPage({ params }: PageProps) {
 
   if (!item) notFound()
 
+  const { data: alternates, error: alternatesError } = await supabase
+    .from('item_alternates')
+    .select('id, alternate_item_id, notes, inventory_items!alternate_item_id(id, name, sku)')
+    .eq('item_id', id)
+
+  if (alternatesError) {
+    console.error('Failed to fetch alternates:', alternatesError)
+  }
+
   return (
     <div>
       <Header title="Edit Item" subtitle={item.name} />
       <div className="p-6">
-        <InventoryItemForm item={item} />
+        <InventoryItemForm item={item} alternates={alternates ?? []} />
       </div>
     </div>
   )

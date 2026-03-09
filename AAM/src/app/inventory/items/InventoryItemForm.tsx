@@ -35,11 +35,19 @@ const UNIT_OPTIONS = [
   { value: 'set', label: 'Set' },
 ]
 
-interface Props {
-  item?: InventoryItem
+interface AlternateItem {
+  id: string
+  alternate_item_id: string
+  notes: string | null
+  inventory_items: { id: string; name: string; sku: string | null }[]
 }
 
-export default function InventoryItemForm({ item }: Props) {
+interface Props {
+  item?: InventoryItem
+  alternates?: AlternateItem[]
+}
+
+export default function InventoryItemForm({ item, alternates }: Props) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
