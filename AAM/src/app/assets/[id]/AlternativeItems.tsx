@@ -66,7 +66,7 @@ export default function AlternativeItems({ assetId, items }: Props) {
       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-4 sm:px-6">
         <div className="flex items-center gap-2">
           <ArrowRightLeft className="h-5 w-5 text-orange-600" />
-          <h2 className="font-semibold text-gray-900">Alternative Items</h2>
+          <h2 className="font-semibold text-gray-900">Alternative Inventory Items</h2>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -137,7 +137,7 @@ export default function AlternativeItems({ assetId, items }: Props) {
             disabled={saving}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
-            {saving ? 'Saving...' : 'Add Alternative'}
+            {saving ? 'Saving...' : 'Add Inventory Item'}
           </button>
         </form>
       )}
@@ -162,7 +162,7 @@ export default function AlternativeItems({ assetId, items }: Props) {
                   onClick={() => handleDelete(item.id)}
                   disabled={deleting === item.id}
                   className="flex-shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                  aria-label="Delete alternative"
+                  aria-label="Delete inventory item"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -170,7 +170,7 @@ export default function AlternativeItems({ assetId, items }: Props) {
             </div>
           ))
         ) : (
-          <p className="px-4 py-4 sm:px-6 text-sm text-gray-400">No alternatives listed.</p>
+          <p className="px-4 py-4 sm:px-6 text-sm text-gray-400">No alternative inventory items listed.</p>
         )}
       </div>
     </section>

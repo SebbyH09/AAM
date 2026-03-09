@@ -147,7 +147,7 @@ create table notification_log (
   status text not null default 'sent' check (status in ('sent', 'failed'))
 );
 
--- Alternative items (substitute/replacement options for assets)
+-- Alternative inventory items (substitute/replacement options for assets)
 create table alternative_items (
   id uuid primary key default uuid_generate_v4(),
   asset_id uuid references assets(id) on delete cascade,

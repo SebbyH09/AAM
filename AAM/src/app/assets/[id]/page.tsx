@@ -81,7 +81,7 @@ export default async function AssetDetailPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Alternative Items */}
+        {/* Alternative Inventory Items */}
         <AlternativeItems assetId={id} items={alternatives ?? []} />
 
         {/* Details Grid */}
