@@ -49,6 +49,26 @@ export interface Database {
         Insert: Omit<NotificationLog, 'id' | 'sent_at'>
         Update: Partial<Omit<NotificationLog, 'id' | 'sent_at'>>
       }
+      inventory_items: {
+        Row: InventoryItem
+        Insert: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>>
+      }
+      inventory_orders: {
+        Row: InventoryOrder
+        Insert: Omit<InventoryOrder, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<InventoryOrder, 'id' | 'created_at' | 'updated_at'>>
+      }
+      inventory_order_items: {
+        Row: InventoryOrderItem
+        Insert: Omit<InventoryOrderItem, 'id' | 'created_at'>
+        Update: Partial<Omit<InventoryOrderItem, 'id' | 'created_at'>>
+      }
+      cycle_counts: {
+        Row: CycleCount
+        Insert: Omit<CycleCount, 'id' | 'created_at'>
+        Update: Partial<Omit<CycleCount, 'id' | 'created_at'>>
+      }
     }
   }
 }
@@ -187,6 +207,83 @@ export interface NotificationLog {
   sent_at: string
   status: 'sent' | 'failed'
 }
+
+// ─── Inventory Manager Types ────────────────────────────────────────
+
+export interface InventoryItem {
+  id: string
+  name: string
+  sku: string | null
+  category: 'Reagents' | 'Filters' | 'PPE' | 'Cleaning Supplies' | 'Office Supplies' | 'Lab Consumables' | 'Electrical' | 'Mechanical Parts' | 'Other'
+  description: string | null
+  unit: string
+  quantity_on_hand: number
+  reorder_point: number
+  reorder_quantity: number
+  unit_cost: number | null
+  location: string | null
+  vendor: string | null
+  last_counted_date: string | null
+  next_count_date: string | null
+  is_active: boolean
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface InventoryOrder {
+  id: string
+  order_number: string | null
+  vendor: string
+  status: 'draft' | 'submitted' | 'approved' | 'ordered' | 'shipped' | 'received' | 'cancelled'
+  order_date: string
+  expected_date: string | null
+  received_date: string | null
+  total_cost: number | null
+  notes: string | null
+  ordered_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface InventoryOrderItem {
+  id: string
+  order_id: string
+  item_id: string
+  quantity: number
+  unit_cost: number | null
+  total_cost: number | null
+  received_quantity: number | null
+  created_at: string
+}
+
+export interface CycleCount {
+  id: string
+  item_id: string
+  counted_by: string
+  count_date: string
+  expected_quantity: number
+  actual_quantity: number
+  variance: number
+  notes: string | null
+  status: 'pending' | 'completed' | 'reviewed'
+  created_at: string
+}
+
+// Extended inventory types with joins
+export interface InventoryOrderWithItems extends InventoryOrder {
+  inventory_order_items?: (InventoryOrderItem & { inventory_items?: InventoryItem })[]
+}
+
+export interface CycleCountWithItem extends CycleCount {
+  inventory_items?: InventoryItem
+}
+
+export interface InventoryOrderItemWithItem extends InventoryOrderItem {
+  inventory_items?: InventoryItem
+}
+
+// ─── Asset Manager Extended Types ───────────────────────────────────
 
 // Extended types with joins
 export interface AssetWithDetails extends Asset {

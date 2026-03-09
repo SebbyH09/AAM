@@ -71,6 +71,14 @@ export function statusColor(status: string): string {
     medium: 'bg-blue-100 text-blue-800',
     high: 'bg-orange-100 text-orange-800',
     critical: 'bg-red-100 text-red-800',
+    // Inventory order statuses
+    draft: 'bg-gray-100 text-gray-800',
+    submitted: 'bg-blue-100 text-blue-800',
+    approved: 'bg-indigo-100 text-indigo-800',
+    ordered: 'bg-purple-100 text-purple-800',
+    shipped: 'bg-yellow-100 text-yellow-800',
+    received: 'bg-green-100 text-green-800',
+    reviewed: 'bg-green-100 text-green-800',
   }
   return map[status] ?? 'bg-gray-100 text-gray-800'
 }

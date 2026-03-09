@@ -13,12 +13,15 @@ import {
   Settings,
   Package,
   LogOut,
+  Boxes,
+  ShoppingCart,
+  ClipboardCheck,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
-const navigation = [
+const assetNavigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Assets', href: '/assets', icon: Package },
   { name: 'Service Contracts', href: '/contracts', icon: FileText },
@@ -26,6 +29,13 @@ const navigation = [
   { name: 'Repairs', href: '/repairs', icon: Wrench },
   { name: 'Downtime', href: '/downtime', icon: Clock },
   { name: 'Notifications', href: '/notifications', icon: Bell },
+]
+
+const inventoryNavigation = [
+  { name: 'Inventory Dashboard', href: '/inventory', icon: LayoutDashboard },
+  { name: 'Inventory Items', href: '/inventory/items', icon: Boxes },
+  { name: 'Orders', href: '/inventory/orders', icon: ShoppingCart },
+  { name: 'Cycle Counts', href: '/inventory/cycle-counts', icon: ClipboardCheck },
 ]
 
 export default function Sidebar() {
@@ -53,28 +63,58 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {navigation.map((item) => {
-          const isActive = item.href === '/'
-            ? pathname === '/'
-            : pathname.startsWith(item.href)
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Asset Manager</p>
+        <div className="space-y-1">
+          {assetNavigation.map((item) => {
+            const isActive = item.href === '/'
+              ? pathname === '/'
+              : pathname.startsWith(item.href)
 
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-              )}
-            >
-              <item.icon className="h-5 w-5 flex-shrink-0" />
-              {item.name}
-            </Link>
-          )
-        })}
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                )}
+              >
+                <item.icon className="h-5 w-5 flex-shrink-0" />
+                {item.name}
+              </Link>
+            )
+          })}
+        </div>
+
+        <div className="my-4 border-t border-slate-700" />
+
+        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Inventory Manager</p>
+        <div className="space-y-1">
+          {inventoryNavigation.map((item) => {
+            const isActive = item.href === '/inventory'
+              ? pathname === '/inventory'
+              : pathname.startsWith(item.href)
+
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                )}
+              >
+                <item.icon className="h-5 w-5 flex-shrink-0" />
+                {item.name}
+              </Link>
+            )
+          })}
+        </div>
       </nav>
 
       {/* Footer */}
@@ -86,7 +126,7 @@ export default function Sidebar() {
           <LogOut className="h-5 w-5 flex-shrink-0" />
           Sign out
         </button>
-        <p className="mt-2 text-xs text-slate-500">Asset Manager v1.0</p>
+        <p className="mt-2 text-xs text-slate-500">Aera Manager v1.0</p>
       </div>
     </div>
   )
