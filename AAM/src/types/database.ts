@@ -49,6 +49,11 @@ export interface Database {
         Insert: Omit<NotificationLog, 'id' | 'sent_at'>
         Update: Partial<Omit<NotificationLog, 'id' | 'sent_at'>>
       }
+      alternative_items: {
+        Row: AlternativeItem
+        Insert: Omit<AlternativeItem, 'id' | 'created_at'>
+        Update: Partial<Omit<AlternativeItem, 'id' | 'created_at'>>
+      }
     }
   }
 }
@@ -186,6 +191,19 @@ export interface NotificationLog {
   related_type: string | null
   sent_at: string
   status: 'sent' | 'failed'
+}
+
+export interface AlternativeItem {
+  id: string
+  asset_id: string | null
+  name: string
+  manufacturer: string | null
+  model: string | null
+  part_number: string | null
+  supplier: string | null
+  estimated_cost: number | null
+  notes: string | null
+  created_at: string
 }
 
 // Extended types with joins

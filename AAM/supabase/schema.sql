@@ -147,6 +147,20 @@ create table notification_log (
   status text not null default 'sent' check (status in ('sent', 'failed'))
 );
 
+-- Alternative items (substitute/replacement options for assets)
+create table alternative_items (
+  id uuid primary key default uuid_generate_v4(),
+  asset_id uuid references assets(id) on delete cascade,
+  name text not null,
+  manufacturer text,
+  model text,
+  part_number text,
+  supplier text,
+  estimated_cost numeric(12,2),
+  notes text,
+  created_at timestamptz default now()
+);
+
 -- Indexes
 create index idx_service_contracts_asset_id on service_contracts(asset_id);
 create index idx_service_contracts_end_date on service_contracts(end_date);
@@ -156,6 +170,7 @@ create index idx_maintenance_records_asset_id on maintenance_records(asset_id);
 create index idx_repairs_asset_id on repairs(asset_id);
 create index idx_repairs_status on repairs(status);
 create index idx_downtime_asset_id on downtime_events(asset_id);
+create index idx_alternative_items_asset_id on alternative_items(asset_id);
 
 -- Updated at trigger
 create or replace function update_updated_at()
@@ -187,6 +202,7 @@ alter table repairs enable row level security;
 alter table downtime_events enable row level security;
 alter table notification_rules enable row level security;
 alter table notification_log enable row level security;
+alter table alternative_items enable row level security;
 
 -- Allow all authenticated users (adjust as needed)
 create policy "Allow all for authenticated" on assets for all using (true);
@@ -197,6 +213,7 @@ create policy "Allow all for authenticated" on repairs for all using (true);
 create policy "Allow all for authenticated" on downtime_events for all using (true);
 create policy "Allow all for authenticated" on notification_rules for all using (true);
 create policy "Allow all for authenticated" on notification_log for all using (true);
+create policy "Allow all for authenticated" on alternative_items for all using (true);
 
 -- Storage policy
 create policy "Allow authenticated users to upload contracts"
