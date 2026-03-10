@@ -1,16 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { MaintenancePlan } from '@/types/database'
+import { MapPin } from 'lucide-react'
 
 interface Asset {
   id: string
   name: string
   asset_tag: string | null
+  location: string | null
 }
 
 interface MaintenancePlanFormProps {
@@ -59,6 +61,8 @@ export default function MaintenancePlanForm({ assets, plan, defaultAssetId }: Ma
     estimated_duration_hours: plan?.estimated_duration_hours?.toString() ?? '',
     is_active: plan?.is_active ?? true,
   })
+
+  const selectedAsset = useMemo(() => assets.find((a) => a.id === form.asset_id), [assets, form.asset_id])
 
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }))
@@ -114,6 +118,15 @@ export default function MaintenancePlanForm({ assets, plan, defaultAssetId }: Ma
           <div className="sm:col-span-2">
             <Select label="Asset" value={form.asset_id} onChange={set('asset_id')} options={assetOptions} />
           </div>
+          {selectedAsset && (
+            <div className="sm:col-span-2">
+              <div className="flex items-center gap-2 rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
+                <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
+                <span className="text-sm text-gray-500">Location:</span>
+                <span className="text-sm font-medium text-gray-700">{selectedAsset.location || 'Not specified'}</span>
+              </div>
+            </div>
+          )}
           <div className="sm:col-span-2">
             <Input label="Plan Name *" value={form.name} onChange={set('name')} placeholder="e.g. Monthly Filter Replacement" />
           </div>

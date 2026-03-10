@@ -1,10 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import Header from '@/components/layout/Header'
-import { Badge } from '@/components/ui/Badge'
-import { formatDate, formatCurrency, statusColor } from '@/lib/utils'
 import Link from 'next/link'
-import { Plus, Package } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import AssetsClient from './AssetsClient'
+import AssetImport from './AssetImport'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,7 +31,8 @@ export default async function AssetsPage() {
         }
       />
 
-      <div className="p-6">
+      <div className="p-6 space-y-6">
+        <AssetImport />
         <AssetsClient assets={assets ?? []} />
       </div>
     </div>

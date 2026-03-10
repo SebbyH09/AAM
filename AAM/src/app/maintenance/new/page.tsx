@@ -11,7 +11,7 @@ interface PageProps {
 export default async function NewMaintenancePlanPage({ searchParams }: PageProps) {
   const { asset_id } = await searchParams
   const supabase = await createClient()
-  const { data: assets } = await supabase.from('assets').select('id, name, asset_tag').order('name')
+  const { data: assets } = await supabase.from('assets').select('id, name, asset_tag, location').order('name')
 
   return (
     <div>
