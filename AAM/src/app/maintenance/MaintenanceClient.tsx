@@ -17,7 +17,7 @@ interface Plan {
   assigned_to: string | null
   is_active: boolean
   estimated_duration_hours: number | null
-  assets: { name: string; asset_tag: string | null } | null
+  assets: { name: string; asset_tag: string | null; location: string | null } | null
 }
 
 interface MaintenanceClientProps {
@@ -117,6 +117,7 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Plan</th>
                         <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Asset</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Location</th>
                         <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Frequency</th>
                         <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Next Due</th>
                         <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Last Done</th>
@@ -138,6 +139,9 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-600">
                               {plan.assets?.name ?? '—'}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {plan.assets?.location ?? '—'}
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-600 capitalize">
                               {plan.frequency.replace('_', ' ')}

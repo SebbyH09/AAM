@@ -11,7 +11,7 @@ export default async function MaintenancePage() {
 
   const { data: plans } = await supabase
     .from('maintenance_plans')
-    .select('*, assets(name, asset_tag)')
+    .select('*, assets(name, asset_tag, location)')
     .order('next_due_date')
 
   return (

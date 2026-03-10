@@ -15,7 +15,7 @@ export default async function EditMaintenancePlanPage({ params }: PageProps) {
 
   const [{ data: plan }, { data: assets }] = await Promise.all([
     supabase.from('maintenance_plans').select('*').eq('id', id).single(),
-    supabase.from('assets').select('id, name, asset_tag').order('name'),
+    supabase.from('assets').select('id, name, asset_tag, location').order('name'),
   ])
 
   if (!plan) notFound()
