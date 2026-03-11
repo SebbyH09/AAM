@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
-import { Upload, FileSpreadsheet, CheckCircle2, XCircle, Download, AlertTriangle } from 'lucide-react'
+import { Upload, CheckCircle2, XCircle, Download, AlertTriangle } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
 const VALID_CATEGORIES = ['Analytical', 'Lab Equipment', 'HVAC', 'IT/Network', 'Electrical', 'Mechanical', 'Other']
@@ -34,7 +34,11 @@ interface RowResult {
   error?: string
 }
 
-export default function AssetImport() {
+interface AssetImportProps {
+  onSuccess?: () => void
+}
+
+export default function AssetImport({ onSuccess }: AssetImportProps) {
   const router = useRouter()
   const supabase = createClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -228,6 +232,9 @@ export default function AssetImport() {
     const successCount = importResults.filter((r) => r.success).length
     if (successCount > 0) {
       router.refresh()
+      if (importResults.every((r) => r.success)) {
+        onSuccess?.()
+      }
     }
   }
 
@@ -243,17 +250,11 @@ export default function AssetImport() {
   const failCount = results.filter((r) => !r.success).length
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5 text-green-600" />
-            Import Assets from Excel
-          </h3>
-          <p className="text-sm text-gray-500 mt-1">
-            Upload an .xlsx or .xls file to bulk import assets.
-          </p>
-        </div>
+        <p className="text-sm text-gray-500">
+          Upload an .xlsx or .xls file to bulk import assets.
+        </p>
         <Button type="button" variant="outline" size="sm" onClick={downloadExample}>
           <Download className="h-4 w-4" />
           Download Example
