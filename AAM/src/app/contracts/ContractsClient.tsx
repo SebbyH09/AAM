@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge } from '@/lib/utils'
 import Link from 'next/link'
 import { Search, FileText, ChevronRight, Paperclip } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 interface Contract {
   id: string
@@ -16,6 +17,7 @@ interface Contract {
   status: string
   file_name: string | null
   file_url: string | null
+  file_path: string | null
   contract_number: string | null
   assets: { name: string; asset_tag: string | null } | null
 }
@@ -27,6 +29,7 @@ interface ContractsClientProps {
 const STATUS_FILTERS = ['all', 'active', 'expired', 'pending']
 
 export default function ContractsClient({ contracts }: ContractsClientProps) {
+  const supabase = createClient()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
@@ -108,10 +111,23 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                           </p>
                         </div>
                         {contract.file_name && (
-                          <a href={contract.file_url ?? '#'} target="_blank" rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-600" title={contract.file_name}>
+                          <button
+                            onClick={async () => {
+                              if (!contract.file_path) return
+                              const { data, error } = await supabase.storage
+                                .from('contracts')
+                                .createSignedUrl(contract.file_path, 60)
+                              if (error) {
+                                console.error(error)
+                                return
+                              }
+                              window.open(data.signedUrl, '_blank')
+                            }}
+                            className="text-blue-400 hover:text-blue-600"
+                            title={contract.file_name}
+                          >
                             <Paperclip className="h-4 w-4" />
-                          </a>
+                          </button>
                         )}
                       </div>
                     </td>
