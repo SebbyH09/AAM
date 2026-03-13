@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor } from '@/lib/utils'
 import { Asset } from '@/types/database'
@@ -15,6 +16,7 @@ interface AssetsClientProps {
 }
 
 export default function AssetsClient({ assets }: AssetsClientProps) {
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [selectedStatus, setSelectedStatus] = useState('all')
@@ -87,12 +89,17 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Location</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Purchase Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Date Installed</th>
                 <th className="relative px-6 py-3"><span className="sr-only">View</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map((asset) => (
-                <tr key={asset.id} className="hover:bg-gray-50 transition-colors">
+                <tr
+                  key={asset.id}
+                  onClick={() => router.push(`/assets/${asset.id}`)}
+                  className="hover:bg-gray-50 transition-colors cursor-pointer"
+                >
                   <td className="px-6 py-4">
                     <div>
                       <p className="text-sm font-medium text-gray-900">{asset.name}</p>
@@ -107,14 +114,9 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
                     <Badge className={statusColor(asset.status)}>{asset.status}</Badge>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">{formatDate(asset.purchase_date)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{formatDate(asset.date_installed)}</td>
                   <td className="px-6 py-4 text-right">
-                    <Link
-                      href={`/assets/${asset.id}`}
-                      className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
-                    >
-                      View
-                      <ChevronRight className="h-4 w-4" />
-                    </Link>
+                    <ChevronRight className="h-4 w-4 text-gray-400" />
                   </td>
                 </tr>
               ))}

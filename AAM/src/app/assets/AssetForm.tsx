@@ -46,6 +46,7 @@ export default function AssetForm({ asset }: AssetFormProps) {
     status: asset?.status ?? 'active',
     purchase_date: asset?.purchase_date ?? '',
     purchase_cost: asset?.purchase_cost?.toString() ?? '',
+    date_installed: asset?.date_installed ?? '',
     notes: asset?.notes ?? '',
   })
 
@@ -73,6 +74,7 @@ export default function AssetForm({ asset }: AssetFormProps) {
       status: form.status as Asset['status'],
       purchase_date: form.purchase_date || null,
       purchase_cost: form.purchase_cost ? parseFloat(form.purchase_cost) : null,
+      date_installed: form.date_installed || null,
       notes: form.notes || null,
     }
 
@@ -113,6 +115,7 @@ export default function AssetForm({ asset }: AssetFormProps) {
           <Select label="Status" value={form.status} onChange={set('status')} options={STATUS_OPTIONS} />
           <Input label="Purchase Date" type="date" value={form.purchase_date} onChange={set('purchase_date')} />
           <Input label="Purchase Cost ($)" type="number" value={form.purchase_cost} onChange={set('purchase_cost')} placeholder="0.00" step="0.01" min="0" />
+          <Input label="Date Installed" type="date" value={form.date_installed} onChange={set('date_installed')} />
           <div className="sm:col-span-2">
             <Textarea label="Notes" value={form.notes} onChange={set('notes')} placeholder="Additional notes..." />
           </div>

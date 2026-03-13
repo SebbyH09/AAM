@@ -11,7 +11,7 @@ const VALID_CATEGORIES = ['Analytical', 'Lab Equipment', 'HVAC', 'IT/Network', '
 const VALID_STATUSES = ['active', 'inactive', 'repair', 'decommissioned']
 
 const REQUIRED_COLUMNS = ['name', 'category']
-const OPTIONAL_COLUMNS = ['asset_tag', 'manufacturer', 'model', 'serial_number', 'location', 'status', 'purchase_date', 'purchase_cost', 'notes']
+const OPTIONAL_COLUMNS = ['asset_tag', 'manufacturer', 'model', 'serial_number', 'location', 'status', 'purchase_date', 'purchase_cost', 'date_installed', 'notes']
 
 interface ParsedRow {
   name: string
@@ -24,6 +24,7 @@ interface ParsedRow {
   status?: string
   purchase_date?: string
   purchase_cost?: number
+  date_installed?: string
   notes?: string
 }
 
@@ -145,6 +146,7 @@ export default function AssetImport({ onSuccess }: AssetImportProps) {
             status: normalizedRow.status ? String(normalizedRow.status).trim().toLowerCase() : undefined,
             purchase_date: normalizedRow.purchase_date ? String(normalizedRow.purchase_date).trim() : undefined,
             purchase_cost: normalizedRow.purchase_cost ? Number(normalizedRow.purchase_cost) : undefined,
+            date_installed: normalizedRow.date_installed ? String(normalizedRow.date_installed).trim() : undefined,
             notes: normalizedRow.notes ? String(normalizedRow.notes).trim() : undefined,
           }
         })
@@ -213,6 +215,7 @@ export default function AssetImport({ onSuccess }: AssetImportProps) {
         status: (row.status as 'active' | 'inactive' | 'repair' | 'decommissioned') || 'active',
         purchase_date: row.purchase_date || null,
         purchase_cost: row.purchase_cost ?? null,
+        date_installed: row.date_installed || null,
         notes: row.notes || null,
       }
 

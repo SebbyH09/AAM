@@ -59,7 +59,7 @@ export default async function AssetDetailPage({ params }: PageProps) {
 
       <div className="p-6 space-y-6">
         {/* Asset Info */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <p className="text-xs text-gray-500 uppercase tracking-wide">Status</p>
             <Badge className={`mt-1 ${statusColor(asset.status)}`}>{asset.status}</Badge>
@@ -67,6 +67,10 @@ export default async function AssetDetailPage({ params }: PageProps) {
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <p className="text-xs text-gray-500 uppercase tracking-wide">Location</p>
             <p className="mt-1 text-sm font-semibold text-gray-900">{asset.location ?? '—'}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">Date Installed</p>
+            <p className="mt-1 text-sm font-semibold text-gray-900">{formatDate(asset.date_installed) || '—'}</p>
           </div>
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <p className="text-xs text-gray-500 uppercase tracking-wide">Total Downtime</p>
