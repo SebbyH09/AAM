@@ -88,6 +88,8 @@ export interface ServiceContract {
   file_name: string | null
   file_url: string | null
   status: 'active' | 'expired' | 'pending'
+  pm_last_performed_date: string | null
+  pm_interval_months: number
   notes: string | null
   created_at: string
   updated_at: string

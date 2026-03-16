@@ -40,6 +40,8 @@ create table service_contracts (
   file_name text,
   file_url text,
   status text not null default 'active' check (status in ('active', 'expired', 'pending')),
+  pm_last_performed_date date,
+  pm_interval_months integer not null default 12,
   notes text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
