@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge } from '@/lib/utils'
 import Link from 'next/link'
-import { Search, FileText, ChevronRight, Paperclip } from 'lucide-react'
+import { Search, FileText, ChevronRight, Paperclip, Wrench } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { addMonths, parseISO, differenceInDays, format } from 'date-fns'
 
 interface Contract {
   id: string
@@ -19,7 +20,23 @@ interface Contract {
   file_url: string | null
   file_path: string | null
   contract_number: string | null
+  pm_last_performed_date: string | null
+  pm_interval_months: number
   assets: { name: string; asset_tag: string | null } | null
+}
+
+function getPmStatus(contract: Contract): { label: string; nextDate: string; color: string } | null {
+  if (!contract.pm_last_performed_date) return null
+  const lastDate = parseISO(contract.pm_last_performed_date)
+  const nextDate = addMonths(lastDate, contract.pm_interval_months)
+  const daysLeft = differenceInDays(nextDate, new Date())
+  const nextFormatted = format(nextDate, 'MMM d, yyyy')
+
+  if (daysLeft < 0) return { label: `${Math.abs(daysLeft)}d overdue`, nextDate: nextFormatted, color: 'bg-red-100 text-red-800' }
+  if (daysLeft === 0) return { label: 'Due today', nextDate: nextFormatted, color: 'bg-red-100 text-red-800' }
+  if (daysLeft <= 30) return { label: `${daysLeft}d left`, nextDate: nextFormatted, color: 'bg-orange-100 text-orange-800' }
+  if (daysLeft <= 90) return { label: `${daysLeft}d left`, nextDate: nextFormatted, color: 'bg-yellow-100 text-yellow-800' }
+  return { label: `${daysLeft}d left`, nextDate: nextFormatted, color: 'bg-green-100 text-green-800' }
 }
 
 interface ContractsClientProps {
@@ -92,6 +109,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Period</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Expiry</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Cost</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">PM Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
                 <th className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
               </tr>
@@ -99,6 +117,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
             <tbody className="divide-y divide-gray-100">
               {filtered.map((contract) => {
                 const badge = dueStatusBadge(contract.end_date)
+                const pm = getPmStatus(contract)
                 return (
                   <tr key={contract.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
@@ -141,6 +160,20 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                       <Badge className={badge.color}>{badge.label}</Badge>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{formatCurrency(contract.cost)}</td>
+                    <td className="px-6 py-4">
+                      {pm ? (
+                        <div className="flex flex-col gap-0.5">
+                          <Badge className={pm.color}>
+                            <Wrench className="mr-1 inline h-3 w-3" />
+                            {pm.label}
+                          </Badge>
+                          <span className="text-[11px] text-gray-500">Next: {pm.nextDate}</span>
+                          <span className="text-[11px] text-gray-400">Last: {formatDate(contract.pm_last_performed_date)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">Not set</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4">
                       <Badge className={statusColor(contract.status)}>{contract.status}</Badge>
                     </td>

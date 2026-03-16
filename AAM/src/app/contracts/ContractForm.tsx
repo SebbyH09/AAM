@@ -59,6 +59,8 @@ export default function ContractForm({ assets, contract, defaultAssetId }: Contr
     cost: contract?.cost?.toString() ?? '',
     coverage_details: contract?.coverage_details ?? '',
     status: contract?.status ?? 'active',
+    pm_last_performed_date: contract?.pm_last_performed_date ?? '',
+    pm_interval_months: contract?.pm_interval_months?.toString() ?? '12',
     notes: contract?.notes ?? '',
   })
 
@@ -100,6 +102,8 @@ export default function ContractForm({ assets, contract, defaultAssetId }: Contr
       cost: form.cost ? parseFloat(form.cost) : null,
       coverage_details: form.coverage_details || null,
       status: form.status,
+      pm_last_performed_date: form.pm_last_performed_date || null,
+      pm_interval_months: form.pm_interval_months ? parseInt(form.pm_interval_months) : 12,
       notes: form.notes || null,
     }
 
@@ -160,6 +164,13 @@ export default function ContractForm({ assets, contract, defaultAssetId }: Contr
           <div className="sm:col-span-2">
             <Textarea label="Coverage Details" value={form.coverage_details} onChange={set('coverage_details')} placeholder="What does this contract cover?" rows={3} />
           </div>
+
+          {/* Preventative Maintenance */}
+          <div className="sm:col-span-2">
+            <p className="text-sm font-semibold text-gray-700 border-b border-gray-200 pb-1 mb-2">Preventative Maintenance</p>
+          </div>
+          <Input label="PM Last Performed" type="date" value={form.pm_last_performed_date} onChange={set('pm_last_performed_date')} />
+          <Input label="PM Interval (months)" type="number" value={form.pm_interval_months} onChange={set('pm_interval_months')} placeholder="12" min="1" max="60" />
           <div className="sm:col-span-2">
             <Textarea label="Notes" value={form.notes} onChange={set('notes')} placeholder="Additional notes..." />
           </div>
