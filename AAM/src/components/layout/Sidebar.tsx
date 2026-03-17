@@ -13,6 +13,7 @@ import {
   Settings,
   Package,
   LogOut,
+  X,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -29,7 +30,7 @@ const assetNavigation = [
 ]
 
 
-export default function Sidebar() {
+export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -47,10 +48,18 @@ export default function Sidebar() {
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
           <Settings className="h-5 w-5 text-white" />
         </div>
-        <div>
+        <div className="flex-1">
           <p className="text-sm font-semibold text-white">Asset Manager</p>
           <p className="text-xs text-slate-400">Service & Maintenance</p>
         </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white md:hidden"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -66,6 +75,7 @@ export default function Sidebar() {
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={onClose}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                   isActive
