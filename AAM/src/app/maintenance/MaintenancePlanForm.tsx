@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { MaintenancePlan } from '@/types/database'
-import { MapPin } from 'lucide-react'
+import { MapPin, Plus, Trash2 } from 'lucide-react'
 
 interface Asset {
   id: string
@@ -59,8 +59,19 @@ export default function MaintenancePlanForm({ assets, plan, defaultAssetId }: Ma
     assigned_to: plan?.assigned_to ?? '',
     priority: plan?.priority ?? 'medium',
     estimated_duration_hours: plan?.estimated_duration_hours?.toString() ?? '',
+    estimated_cost: plan?.estimated_cost?.toString() ?? '',
     is_active: plan?.is_active ?? true,
   })
+
+  const [parts, setParts] = useState<{ name: string; quantity: string; part_number: string }[]>(
+    plan?.parts?.map((p: any) => ({ name: p.name ?? '', quantity: p.quantity?.toString() ?? '1', part_number: p.part_number ?? '' })) ?? []
+  )
+
+  const addPart = () => setParts((prev) => [...prev, { name: '', quantity: '1', part_number: '' }])
+  const removePart = (index: number) => setParts((prev) => prev.filter((_, i) => i !== index))
+  const updatePart = (index: number, field: string, value: string) => {
+    setParts((prev) => prev.map((p, i) => i === index ? { ...p, [field]: value } : p))
+  }
 
   const selectedAsset = useMemo(() => assets.find((a) => a.id === form.asset_id), [assets, form.asset_id])
 
@@ -77,6 +88,7 @@ export default function MaintenancePlanForm({ assets, plan, defaultAssetId }: Ma
     setLoading(true)
     setError('')
 
+    const validParts = parts.filter((p) => p.name.trim())
     const payload = {
       asset_id: form.asset_id || null,
       name: form.name,
@@ -87,6 +99,8 @@ export default function MaintenancePlanForm({ assets, plan, defaultAssetId }: Ma
       assigned_to: form.assigned_to || null,
       priority: form.priority as MaintenancePlan['priority'],
       estimated_duration_hours: form.estimated_duration_hours ? parseFloat(form.estimated_duration_hours) : null,
+      estimated_cost: form.estimated_cost ? parseFloat(form.estimated_cost) : null,
+      parts: validParts.length > 0 ? validParts.map((p) => ({ name: p.name, quantity: p.quantity ? parseInt(p.quantity) : 1, part_number: p.part_number || undefined })) : null,
       is_active: form.is_active,
     }
 
@@ -141,6 +155,54 @@ export default function MaintenancePlanForm({ assets, plan, defaultAssetId }: Ma
           <Select label="Priority" value={form.priority} onChange={set('priority')} options={PRIORITY_OPTIONS} />
           <Input label="Assigned To" value={form.assigned_to} onChange={set('assigned_to')} placeholder="Technician or team" />
           <Input label="Est. Duration (hours)" type="number" value={form.estimated_duration_hours} onChange={set('estimated_duration_hours')} placeholder="0.0" step="0.5" min="0" />
+          <Input label="Est. Cost ($)" type="number" value={form.estimated_cost} onChange={set('estimated_cost')} placeholder="0.00" step="0.01" min="0" />
+
+          {/* Parts Section */}
+          <div className="sm:col-span-2">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">Required Parts</label>
+              <button type="button" onClick={addPart} className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800">
+                <Plus className="h-3 w-3" />
+                Add Part
+              </button>
+            </div>
+            {parts.length === 0 ? (
+              <p className="text-xs text-gray-400">No parts added yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {parts.map((part, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Part name"
+                      value={part.name}
+                      onChange={(e) => updatePart(i, 'name', e.target.value)}
+                      className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Qty"
+                      value={part.quantity}
+                      onChange={(e) => updatePart(i, 'quantity', e.target.value)}
+                      min="1"
+                      className="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Part # (optional)"
+                      value={part.part_number}
+                      onChange={(e) => updatePart(i, 'part_number', e.target.value)}
+                      className="w-36 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <button type="button" onClick={() => removePart(i)} className="p-1 text-red-400 hover:text-red-600">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="sm:col-span-2">
             <label className="flex items-center gap-3 cursor-pointer">
               <input

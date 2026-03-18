@@ -107,6 +107,8 @@ export interface MaintenancePlan {
   assigned_to: string | null
   priority: 'low' | 'medium' | 'high' | 'critical'
   estimated_duration_hours: number | null
+  estimated_cost: number | null
+  parts: { name: string; quantity?: number; part_number?: string }[] | null
   checklist: Json | null
   is_active: boolean
   created_at: string
