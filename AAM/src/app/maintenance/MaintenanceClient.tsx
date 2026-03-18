@@ -2,22 +2,27 @@
 
 import { useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/Badge'
-import { formatDate, statusColor, dueStatusBadge, getDueStatus } from '@/lib/utils'
+import { formatDate, formatCurrency, statusColor, dueStatusBadge, getDueStatus } from '@/lib/utils'
 import Link from 'next/link'
-import { Search, ClipboardList, CheckCircle2, AlertTriangle, Plus, Minus, Clock, MapPin, ChevronRight } from 'lucide-react'
+import { Search, ClipboardList, CheckCircle2, AlertTriangle, Plus, Minus, Clock, MapPin, ChevronRight, Package, X } from 'lucide-react'
 import LogMaintenanceModal from './LogMaintenanceModal'
 
 interface Plan {
   id: string
   name: string
+  description: string | null
   asset_id: string | null
   frequency: string
+  frequency_days: number | null
   next_due_date: string
   last_performed_date: string | null
   priority: string
   assigned_to: string | null
   is_active: boolean
   estimated_duration_hours: number | null
+  estimated_cost: number | null
+  parts: { name: string; quantity?: number; part_number?: string }[] | null
+  checklist: any | null
   assets: { id: string; name: string; asset_tag: string | null; location: string | null; category: string; status: string } | null
 }
 
@@ -45,6 +50,7 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [showActive, setShowActive] = useState(true)
   const [loggingPlan, setLoggingPlan] = useState<Plan | null>(null)
+  const [detailPlan, setDetailPlan] = useState<Plan | null>(null)
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set())
 
   const filtered = plans.filter((p) => {
@@ -275,6 +281,8 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                             <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Frequency</th>
                             <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Next Due</th>
                             <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Last Done</th>
+                            <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Parts</th>
+                            <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Est. Cost</th>
                             <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Priority</th>
                             <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Assigned To</th>
                             <th className="relative px-6 py-2.5"><span className="sr-only">Actions</span></th>
@@ -284,7 +292,7 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                           {group.plans.map((plan) => {
                             const badge = dueStatusBadge(plan.next_due_date)
                             return (
-                              <tr key={plan.id} className="hover:bg-gray-50 transition-colors">
+                              <tr key={plan.id} onClick={() => setDetailPlan(plan)} className="hover:bg-blue-50 transition-colors cursor-pointer">
                                 <td className="px-6 py-3">
                                   <p className="text-sm font-medium text-gray-900">{plan.name}</p>
                                   {plan.estimated_duration_hours && (
@@ -304,13 +312,26 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                                   {formatDate(plan.last_performed_date)}
                                 </td>
                                 <td className="px-6 py-3">
+                                  {plan.parts && plan.parts.length > 0 ? (
+                                    <div className="flex items-center gap-1">
+                                      <Package className="h-3.5 w-3.5 text-gray-400" />
+                                      <span className="text-sm text-gray-600">{plan.parts.length}</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-gray-400">—</span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-3 text-sm text-gray-600">
+                                  {formatCurrency(plan.estimated_cost)}
+                                </td>
+                                <td className="px-6 py-3">
                                   <Badge className={statusColor(plan.priority)}>{plan.priority}</Badge>
                                 </td>
                                 <td className="px-6 py-3 text-sm text-gray-600">
                                   {plan.assigned_to ?? '—'}
                                 </td>
                                 <td className="px-6 py-3 text-right">
-                                  <div className="flex items-center justify-end gap-3">
+                                  <div className="flex items-center justify-end gap-3" onClick={(e) => e.stopPropagation()}>
                                     <button
                                       onClick={() => setLoggingPlan(plan)}
                                       className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-800"
@@ -356,6 +377,121 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
           plan={loggingPlan}
           onClose={() => setLoggingPlan(null)}
         />
+      )}
+
+      {/* Plan Detail Modal */}
+      {detailPlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDetailPlan(null)} />
+          <div className="relative w-full max-w-2xl rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">{detailPlan.name}</h2>
+                <p className="text-sm text-gray-500">{detailPlan.assets?.name ?? 'Unassigned Asset'}</p>
+              </div>
+              <button onClick={() => setDetailPlan(null)} className="rounded-lg p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="max-h-[80vh] overflow-y-auto px-6 py-5 space-y-5">
+              {/* Status badges */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge className={statusColor(detailPlan.priority)}>{detailPlan.priority}</Badge>
+                {dueStatusBadge(detailPlan.next_due_date) && (
+                  <Badge className={dueStatusBadge(detailPlan.next_due_date).color}>
+                    {dueStatusBadge(detailPlan.next_due_date).label}
+                  </Badge>
+                )}
+                <Badge className={detailPlan.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}>
+                  {detailPlan.is_active ? 'Active' : 'Inactive'}
+                </Badge>
+              </div>
+
+              {/* Description */}
+              {detailPlan.description && (
+                <div>
+                  <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Description</h4>
+                  <p className="text-sm text-gray-700">{detailPlan.description}</p>
+                </div>
+              )}
+
+              {/* Details Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Frequency</h4>
+                  <p className="text-sm text-gray-700 capitalize">
+                    {detailPlan.frequency.replace('_', ' ')}
+                    {detailPlan.frequency === 'custom' && detailPlan.frequency_days && ` (every ${detailPlan.frequency_days} days)`}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Assigned To</h4>
+                  <p className="text-sm text-gray-700">{detailPlan.assigned_to ?? '—'}</p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Next Due Date</h4>
+                  <p className="text-sm text-gray-700">{formatDate(detailPlan.next_due_date)}</p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Last Performed</h4>
+                  <p className="text-sm text-gray-700">{formatDate(detailPlan.last_performed_date)}</p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Est. Duration</h4>
+                  <p className="text-sm text-gray-700">{detailPlan.estimated_duration_hours ? `${detailPlan.estimated_duration_hours} hours` : '—'}</p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Est. Cost</h4>
+                  <p className="text-sm text-gray-700">{formatCurrency(detailPlan.estimated_cost)}</p>
+                </div>
+              </div>
+
+              {/* Parts Section */}
+              {detailPlan.parts && detailPlan.parts.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-2">Required Parts</h4>
+                  <div className="rounded-lg border border-gray-200 overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-100">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Part Name</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Qty</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Part #</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {detailPlan.parts.map((part, i) => (
+                          <tr key={i}>
+                            <td className="px-4 py-2 text-sm text-gray-700">{part.name}</td>
+                            <td className="px-4 py-2 text-sm text-gray-600">{part.quantity ?? 1}</td>
+                            <td className="px-4 py-2 text-sm text-gray-500">{part.part_number ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2 border-t border-gray-100">
+                <button
+                  onClick={() => { setDetailPlan(null); setLoggingPlan(detailPlan) }}
+                  className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Log Maintenance
+                </button>
+                <Link
+                  href={`/maintenance/${detailPlan.id}/edit`}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Edit Plan
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

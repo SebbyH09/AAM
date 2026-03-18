@@ -60,6 +60,8 @@ create table maintenance_plans (
   assigned_to text,
   priority text not null default 'medium' check (priority in ('low', 'medium', 'high', 'critical')),
   estimated_duration_hours numeric(5,2),
+  estimated_cost numeric(12,2),
+  parts jsonb,
   checklist jsonb,
   is_active boolean default true,
   created_at timestamptz default now(),
