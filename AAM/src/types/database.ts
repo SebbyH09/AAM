@@ -44,6 +44,11 @@ export interface Database {
         Insert: Omit<NotificationRule, 'id' | 'created_at'>
         Update: Partial<Omit<NotificationRule, 'id' | 'created_at'>>
       }
+      service_reports: {
+        Row: ServiceReport
+        Insert: Omit<ServiceReport, 'id' | 'created_at'>
+        Update: Partial<Omit<ServiceReport, 'id' | 'created_at'>>
+      }
       notification_log: {
         Row: NotificationLog
         Insert: Omit<NotificationLog, 'id' | 'sent_at'>
@@ -155,6 +160,25 @@ export interface Repair {
   notes: string | null
   created_at: string
   updated_at: string
+}
+
+export interface ServiceReport {
+  id: string
+  service_contract_id: string | null
+  maintenance_plan_id: string | null
+  asset_id: string | null
+  report_date: string
+  technician: string
+  type: string
+  summary: string
+  findings: string | null
+  recommendations: string | null
+  parts_used: string | null
+  labor_hours: number | null
+  cost: number | null
+  status: string
+  notes: string | null
+  created_at: string
 }
 
 export interface DowntimeEvent {
