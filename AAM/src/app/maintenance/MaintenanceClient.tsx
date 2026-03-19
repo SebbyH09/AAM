@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge, getDueStatus } from '@/lib/utils'
 import Link from 'next/link'
 import { Search, ClipboardList, CheckCircle2, AlertTriangle, Plus, Minus, Clock, MapPin, ChevronRight, Package, X } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import LogMaintenanceModal from './LogMaintenanceModal'
+import AddServiceReportModal from '../contracts/AddServiceReportModal'
 
 interface Plan {
   id: string
@@ -52,6 +54,29 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
   const [loggingPlan, setLoggingPlan] = useState<Plan | null>(null)
   const [detailPlan, setDetailPlan] = useState<Plan | null>(null)
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set())
+  const [showAddReport, setShowAddReport] = useState(false)
+  const [planReports, setPlanReports] = useState<any[]>([])
+  const [loadingReports, setLoadingReports] = useState(false)
+  const supabase = createClient()
+
+  useEffect(() => {
+    if (detailPlan) {
+      loadPlanReports(detailPlan.id)
+    } else {
+      setPlanReports([])
+    }
+  }, [detailPlan?.id])
+
+  async function loadPlanReports(planId: string) {
+    setLoadingReports(true)
+    const { data } = await supabase
+      .from('service_reports')
+      .select('id, report_date, technician, type, summary, findings, cost, status')
+      .eq('maintenance_plan_id', planId)
+      .order('report_date', { ascending: false })
+    setPlanReports(data ?? [])
+    setLoadingReports(false)
+  }
 
   const filtered = plans.filter((p) => {
     const matchSearch =
@@ -379,6 +404,16 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
         />
       )}
 
+      {showAddReport && detailPlan && (
+        <AddServiceReportModal
+          maintenancePlanId={detailPlan.id}
+          assetId={detailPlan.asset_id}
+          assetName={detailPlan.assets?.name ?? undefined}
+          onClose={() => setShowAddReport(false)}
+          onSaved={() => loadPlanReports(detailPlan.id)}
+        />
+      )}
+
       {/* Plan Detail Modal */}
       {detailPlan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -473,6 +508,70 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                 </div>
               )}
 
+              {/* Service Reports Section */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <ClipboardList className="h-4 w-4" />
+                    Service Reports ({planReports.length})
+                  </h4>
+                  <button
+                    onClick={() => setShowAddReport(true)}
+                    className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Report
+                  </button>
+                </div>
+
+                {loadingReports ? (
+                  <p className="text-sm text-gray-400">Loading reports...</p>
+                ) : planReports.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-gray-300 py-4 text-center">
+                    <p className="text-sm text-gray-500">No service reports yet</p>
+                    <button
+                      onClick={() => setShowAddReport(true)}
+                      className="mt-1 text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      Add the first report
+                    </button>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-gray-200 overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-100">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Date</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Technician</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Summary</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Status</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {planReports.map((r: any) => (
+                          <tr key={r.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-sm text-gray-700">{formatDate(r.report_date)}</td>
+                            <td className="px-4 py-2 text-sm text-gray-700">{r.technician}</td>
+                            <td className="px-4 py-2 text-sm text-gray-700 max-w-[200px] truncate">{r.summary}</td>
+                            <td className="px-4 py-2">
+                              <Badge className={
+                                r.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                r.status === 'requires_followup' ? 'bg-orange-100 text-orange-800' :
+                                'bg-gray-100 text-gray-700'
+                              }>
+                                {r.status.replace(/_/g, ' ')}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-600">{formatCurrency(r.cost)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
               {/* Actions */}
               <div className="flex gap-3 pt-2 border-t border-gray-100">
                 <button
@@ -481,6 +580,13 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   Log Maintenance
+                </button>
+                <button
+                  onClick={() => setShowAddReport(true)}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Service Report
                 </button>
                 <Link
                   href={`/maintenance/${detailPlan.id}/edit`}

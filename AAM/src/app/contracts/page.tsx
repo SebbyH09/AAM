@@ -13,6 +13,7 @@ export default async function ContractsPage() {
     .from('service_contracts')
     .select('*, assets(name, asset_tag)')
     .order('end_date')
+    // All columns are already fetched via '*'
 
   const { data: assets } = await supabase
     .from('assets')

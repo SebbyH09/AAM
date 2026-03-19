@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { Search, FileText, ChevronRight, Paperclip, Wrench } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { addMonths, parseISO, differenceInDays, format } from 'date-fns'
+import ContractDetailModal from './ContractDetailModal'
 
 interface Contract {
   id: string
@@ -22,6 +23,12 @@ interface Contract {
   contract_number: string | null
   pm_last_performed_date: string | null
   pm_interval_months: number
+  vendor_contact: string | null
+  vendor_email: string | null
+  vendor_phone: string | null
+  coverage_details: string | null
+  notes: string | null
+  asset_id: string | null
   assets: { name: string; asset_tag: string | null } | null
 }
 
@@ -49,6 +56,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
   const supabase = createClient()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [selectedContract, setSelectedContract] = useState<Contract | null>(null)
 
   const filtered = contracts.filter((c) => {
     const matchSearch =
@@ -119,7 +127,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                 const badge = dueStatusBadge(contract.end_date)
                 const pm = getPmStatus(contract)
                 return (
-                  <tr key={contract.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={contract.id} className="hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => setSelectedContract(contract)}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <div>
@@ -131,7 +139,8 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                         </div>
                         {contract.file_name && (
                           <button
-                            onClick={async () => {
+                            onClick={async (e) => {
+                              e.stopPropagation()
                               if (!contract.file_path) return
                               const { data, error } = await supabase.storage
                                 .from('contracts')
@@ -177,7 +186,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                     <td className="px-6 py-4">
                       <Badge className={statusColor(contract.status)}>{contract.status}</Badge>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <Link
                         href={`/contracts/${contract.id}/edit`}
                         className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
@@ -191,6 +200,12 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
             </tbody>
           </table>
         </div>
+      )}
+      {selectedContract && (
+        <ContractDetailModal
+          contract={selectedContract}
+          onClose={() => setSelectedContract(null)}
+        />
       )}
     </div>
   )
