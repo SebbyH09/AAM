@@ -3,12 +3,13 @@ import Header from '@/components/layout/Header'
 import { StatCard } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import {
-  Package, FileText, ClipboardList, Wrench,
+  Package, FileText, Wrench,
   Clock, AlertTriangle, CheckCircle, TrendingUp
 } from 'lucide-react'
 import { formatDate, dueStatusBadge, statusColor } from '@/lib/utils'
 import Link from 'next/link'
 import { addDays } from 'date-fns'
+import DashboardMaintenanceSections from './DashboardMaintenanceSections'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,6 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const today = new Date().toISOString().split('T')[0]
   const in30Days = addDays(new Date(), 30).toISOString().split('T')[0]
-  const in7Days = addDays(new Date(), 7).toISOString().split('T')[0]
 
   const [
     { count: totalAssets },
@@ -25,7 +25,6 @@ export default async function DashboardPage() {
     { count: expiringContracts },
     { count: openRepairs },
     { count: overdueMaintenance },
-    { data: upcomingMaintenance },
     { data: expiringContractsList },
     { data: openRepairsList },
     { data: activeDowntime },
@@ -43,13 +42,6 @@ export default async function DashboardPage() {
       .select('*', { count: 'exact', head: true })
       .eq('is_active', true)
       .lt('next_due_date', today),
-    supabase.from('maintenance_plans')
-      .select('*, assets(name, asset_tag)')
-      .eq('is_active', true)
-      .gte('next_due_date', today)
-      .lte('next_due_date', in7Days)
-      .order('next_due_date')
-      .limit(5),
     supabase.from('service_contracts')
       .select('*, assets(name, asset_tag)')
       .eq('status', 'active')
@@ -122,40 +114,8 @@ export default async function DashboardPage() {
         )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Upcoming Maintenance */}
-          <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <div className="flex items-center gap-2">
-                <ClipboardList className="h-5 w-5 text-blue-600" />
-                <h2 className="font-semibold text-gray-900">Maintenance Due This Week</h2>
-              </div>
-              <Link href="/maintenance" className="text-sm text-blue-600 hover:text-blue-800">View all →</Link>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {upcomingMaintenance && upcomingMaintenance.length > 0 ? (
-                upcomingMaintenance.map((plan: any) => {
-                  const badge = dueStatusBadge(plan.next_due_date)
-                  return (
-                    <div key={plan.id} className="flex items-center justify-between px-6 py-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{plan.name}</p>
-                        <p className="text-xs text-gray-500">{plan.assets?.name ?? 'No asset'}</p>
-                      </div>
-                      <div className="flex items-center gap-2 ml-4">
-                        <Badge className={badge.color}>{badge.label}</Badge>
-                        <Badge className={statusColor(plan.priority)}>{plan.priority}</Badge>
-                      </div>
-                    </div>
-                  )
-                })
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <CheckCircle className="h-8 w-8 text-green-400 mb-2" />
-                  <p className="text-sm text-gray-500">No maintenance due this week</p>
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Maintenance sections with adjustable timeline */}
+          <DashboardMaintenanceSections />
 
           {/* Expiring Contracts */}
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
