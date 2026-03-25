@@ -12,6 +12,11 @@ import Link from 'next/link'
 import AddServiceReportModal from './AddServiceReportModal'
 import LogContractPmModal from './LogContractPmModal'
 
+interface ContractAsset {
+  asset_id: string
+  assets: { id: string; name: string; asset_tag: string | null } | null
+}
+
 interface Contract {
   id: string
   vendor_name: string
@@ -32,7 +37,7 @@ interface Contract {
   coverage_details: string | null
   notes: string | null
   asset_id: string | null
-  assets: { name: string; asset_tag: string | null } | null
+  service_contract_assets: ContractAsset[]
 }
 
 interface ServiceReport {
@@ -52,6 +57,20 @@ interface ServiceReport {
 interface ContractDetailModalProps {
   contract: Contract
   onClose: () => void
+}
+
+function getAssetNames(contract: Contract): string {
+  const names = contract.service_contract_assets
+    ?.map((sca) => sca.assets?.name)
+    .filter(Boolean) as string[]
+  if (names && names.length > 0) return names.join(', ')
+  return 'No equipment linked'
+}
+
+function getAssetIds(contract: Contract): string[] {
+  return contract.service_contract_assets
+    ?.map((sca) => sca.asset_id)
+    .filter(Boolean) ?? []
 }
 
 function getPmInfo(contract: Contract) {
@@ -79,6 +98,8 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
   const [showLogPm, setShowLogPm] = useState(false)
 
   const pm = getPmInfo(contract)
+  const assetIds = getAssetIds(contract)
+  const hasAssets = assetIds.length > 0
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -117,7 +138,7 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
             <div>
               <h2 className="text-lg font-semibold text-gray-900">{contract.vendor_name}</h2>
               <p className="text-sm text-gray-500">
-                {contract.assets?.name ?? 'No asset linked'}
+                {getAssetNames(contract)}
                 {contract.contract_number && ` • #${contract.contract_number}`}
               </p>
             </div>
@@ -138,6 +159,20 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
                 </button>
               )}
             </div>
+
+            {/* Linked Equipment */}
+            {contract.service_contract_assets?.length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-2">Linked Equipment</h4>
+                <div className="flex flex-wrap gap-2">
+                  {contract.service_contract_assets.map((sca) => (
+                    <span key={sca.asset_id} className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800">
+                      {sca.assets?.name ?? 'Unknown'}{sca.assets?.asset_tag ? ` (${sca.assets.asset_tag})` : ''}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Contract Details Grid */}
             <div className="grid grid-cols-2 gap-4">
@@ -188,7 +223,7 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
                   <Wrench className="h-4 w-4" />
                   Preventive Maintenance
                 </h4>
-                {contract.asset_id && (
+                {hasAssets && (
                   <Button size="sm" onClick={() => setShowLogPm(true)}>
                     Log PM
                   </Button>
@@ -284,7 +319,7 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
 
             {/* Actions */}
             <div className="flex gap-3 pt-2 border-t border-gray-100">
-              {contract.asset_id && (
+              {hasAssets && (
                 <Button onClick={() => setShowLogPm(true)}>
                   <Wrench className="mr-2 h-4 w-4" />
                   Log PM
@@ -308,14 +343,14 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
       {showAddReport && (
         <AddServiceReportModal
           serviceContractId={contract.id}
-          assetId={contract.asset_id}
-          assetName={contract.assets?.name}
+          assetId={assetIds[0] ?? null}
+          assetName={getAssetNames(contract)}
           onClose={() => setShowAddReport(false)}
           onSaved={loadReports}
         />
       )}
 
-      {showLogPm && contract.asset_id && (
+      {showLogPm && hasAssets && (
         <LogContractPmModal
           contract={contract}
           onClose={() => setShowLogPm(false)}

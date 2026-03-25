@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/Badge'
 import { ClipboardList, CheckCircle, Calendar, Settings2 } from 'lucide-react'
 import { formatDate, dueStatusBadge, statusColor } from '@/lib/utils'
 import Link from 'next/link'
-import { addDays } from 'date-fns'
+import { addDays, addMonths, differenceInDays, parseISO, format } from 'date-fns'
 
 interface MaintenancePlan {
   id: string
@@ -20,11 +20,23 @@ interface MaintenancePlan {
   assets: { name: string; asset_tag: string } | null
 }
 
+interface ServiceContractPM {
+  id: string
+  vendor_name: string
+  contract_number: string | null
+  contract_type: string
+  pm_last_performed_date: string | null
+  pm_interval_months: number
+  next_pm_date: string
+  days_left: number
+  asset_names: string
+}
+
 export default function DashboardMaintenanceSections() {
   const [days, setDays] = useState(7)
   const [daysInput, setDaysInput] = useState('7')
   const [dueMaintenance, setDueMaintenance] = useState<MaintenancePlan[]>([])
-  const [upcomingPMs, setUpcomingPMs] = useState<MaintenancePlan[]>([])
+  const [upcomingPMs, setUpcomingPMs] = useState<ServiceContractPM[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchData = useCallback(async (numDays: number) => {
@@ -33,7 +45,7 @@ export default function DashboardMaintenanceSections() {
     const today = new Date().toISOString().split('T')[0]
     const futureDate = addDays(new Date(), numDays).toISOString().split('T')[0]
 
-    const [{ data: due }, { data: upcoming }] = await Promise.all([
+    const [{ data: due }, { data: contracts }] = await Promise.all([
       // Maintenance due within X days (including overdue)
       supabase
         .from('maintenance_plans')
@@ -43,20 +55,43 @@ export default function DashboardMaintenanceSections() {
         .lte('next_due_date', futureDate)
         .order('next_due_date')
         .limit(10),
-      // Upcoming preventative maintenance within X days
-      // Shows all active plans with a next_due_date within the window
+      // Fetch active service contracts with PM tracking data
       supabase
-        .from('maintenance_plans')
-        .select('*, assets(name, asset_tag)')
-        .eq('is_active', true)
-        .not('next_due_date', 'is', null)
-        .lte('next_due_date', futureDate)
-        .order('next_due_date')
-        .limit(10),
+        .from('service_contracts')
+        .select('*, service_contract_assets(asset_id, assets(name, asset_tag))')
+        .eq('status', 'active')
+        .not('pm_last_performed_date', 'is', null),
     ])
 
+    // Calculate next PM dates from service contracts and filter within window
+    const now = new Date()
+    const futureDateObj = addDays(now, numDays)
+    const contractPMs: ServiceContractPM[] = (contracts ?? [])
+      .map((c: any) => {
+        const lastDate = parseISO(c.pm_last_performed_date)
+        const nextDate = addMonths(lastDate, c.pm_interval_months)
+        const daysLeft = differenceInDays(nextDate, now)
+        const names = (c.service_contract_assets ?? [])
+          .map((sca: any) => sca.assets?.name)
+          .filter(Boolean)
+        return {
+          id: c.id,
+          vendor_name: c.vendor_name,
+          contract_number: c.contract_number,
+          contract_type: c.contract_type,
+          pm_last_performed_date: c.pm_last_performed_date,
+          pm_interval_months: c.pm_interval_months,
+          next_pm_date: format(nextDate, 'yyyy-MM-dd'),
+          days_left: daysLeft,
+          asset_names: names.length > 0 ? names.join(', ') : 'No equipment',
+        }
+      })
+      .filter((c: ServiceContractPM) => c.next_pm_date <= format(futureDateObj, 'yyyy-MM-dd'))
+      .sort((a: ServiceContractPM, b: ServiceContractPM) => a.next_pm_date.localeCompare(b.next_pm_date))
+      .slice(0, 10)
+
     setDueMaintenance(due ?? [])
-    setUpcomingPMs(upcoming ?? [])
+    setUpcomingPMs(contractPMs)
     setLoading(false)
   }, [])
 
@@ -182,7 +217,7 @@ export default function DashboardMaintenanceSections() {
               </span>
             </h2>
           </div>
-          <Link href="/maintenance" className="text-sm text-blue-600 hover:text-blue-800">View all →</Link>
+          <Link href="/contracts" className="text-sm text-blue-600 hover:text-blue-800">View all →</Link>
         </div>
         <div className="divide-y divide-gray-100">
           {loading ? (
@@ -190,27 +225,32 @@ export default function DashboardMaintenanceSections() {
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-purple-600 border-t-transparent" />
             </div>
           ) : upcomingPMs.length > 0 ? (
-            upcomingPMs.map((plan) => {
-              const badge = dueStatusBadge(plan.next_due_date)
+            upcomingPMs.map((contract) => {
+              const badge = dueStatusBadge(contract.next_pm_date)
+              const intervalLabel = contract.pm_interval_months === 1 ? 'Monthly'
+                : contract.pm_interval_months === 3 ? 'Quarterly'
+                : contract.pm_interval_months === 6 ? 'Semi-Annual'
+                : contract.pm_interval_months === 12 ? 'Annual'
+                : `Every ${contract.pm_interval_months} months`
               return (
-                <div key={plan.id} className="flex items-center justify-between px-6 py-3">
+                <div key={contract.id} className="flex items-center justify-between px-6 py-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{plan.name}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">{contract.vendor_name}</p>
                     <p className="text-xs text-gray-500">
-                      {plan.assets?.name ?? 'No asset'}
+                      {contract.asset_names}
                       {' • '}
-                      <span className="text-gray-400">{frequencyLabel(plan.frequency, plan.frequency_days)}</span>
-                      {plan.assigned_to && (
-                        <> • <span className="text-gray-400">{plan.assigned_to}</span></>
+                      <span className="text-gray-400">{intervalLabel}</span>
+                      {contract.contract_number && (
+                        <> • <span className="text-gray-400">#{contract.contract_number}</span></>
                       )}
                     </p>
-                    {plan.last_performed_date && (
-                      <p className="text-xs text-gray-400">Last performed: {formatDate(plan.last_performed_date)}</p>
+                    {contract.pm_last_performed_date && (
+                      <p className="text-xs text-gray-400">Last PM: {formatDate(contract.pm_last_performed_date)}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 ml-4 flex-shrink-0">
                     <Badge className={badge.color}>{badge.label}</Badge>
-                    <Badge className={statusColor(plan.priority)}>{plan.priority}</Badge>
+                    <Badge className={statusColor(contract.contract_type)}>{contract.contract_type.replace(/_/g, ' ')}</Badge>
                   </div>
                 </div>
               )

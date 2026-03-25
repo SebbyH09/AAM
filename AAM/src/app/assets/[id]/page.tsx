@@ -26,7 +26,9 @@ export default async function AssetDetailPage({ params }: PageProps) {
     { data: downtime },
   ] = await Promise.all([
     supabase.from('assets').select('*').eq('id', id).single(),
-    supabase.from('service_contracts').select('*').eq('asset_id', id).order('end_date'),
+    supabase.from('service_contract_assets').select('service_contract_id, service_contracts(*)').eq('asset_id', id).then(({ data }) => ({
+      data: data?.map((sca: any) => sca.service_contracts).filter(Boolean).sort((a: any, b: any) => a.end_date.localeCompare(b.end_date)) ?? [],
+    })),
     supabase.from('maintenance_plans').select('*').eq('asset_id', id).order('next_due_date'),
     supabase.from('maintenance_records').select('*').eq('asset_id', id).order('performed_date', { ascending: false }).limit(10),
     supabase.from('repairs').select('*').eq('asset_id', id).order('reported_date', { ascending: false }),

@@ -54,6 +54,11 @@ export interface Database {
         Insert: Omit<NotificationLog, 'id' | 'sent_at'>
         Update: Partial<Omit<NotificationLog, 'id' | 'sent_at'>>
       }
+      service_contract_assets: {
+        Row: ServiceContractAsset
+        Insert: Omit<ServiceContractAsset, 'id' | 'created_at'>
+        Update: Partial<Omit<ServiceContractAsset, 'id' | 'created_at'>>
+      }
     }
   }
 }
@@ -215,6 +220,13 @@ export interface NotificationLog {
   related_type: string | null
   sent_at: string
   status: 'sent' | 'failed'
+}
+
+export interface ServiceContractAsset {
+  id: string
+  service_contract_id: string
+  asset_id: string
+  created_at: string
 }
 
 // ─── Asset Manager Extended Types ───────────────────────────────────

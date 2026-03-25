@@ -7,12 +7,17 @@ import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 
+interface ContractAsset {
+  asset_id: string
+  assets: { id: string; name: string; asset_tag: string | null } | null
+}
+
 interface Contract {
   id: string
   vendor_name: string
   asset_id: string | null
   pm_interval_months: number
-  assets: { name: string; asset_tag: string | null } | null
+  service_contract_assets: ContractAsset[]
 }
 
 interface LogContractPmModalProps {
@@ -33,6 +38,17 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
   const [error, setError] = useState('')
 
   const today = new Date().toISOString().split('T')[0]
+
+  const linkedAssets = contract.service_contract_assets
+    ?.map((sca) => ({ id: sca.asset_id, name: sca.assets?.name ?? 'Unknown', asset_tag: sca.assets?.asset_tag }))
+    ?? []
+
+  const [selectedAssetId, setSelectedAssetId] = useState(linkedAssets[0]?.id ?? contract.asset_id ?? '')
+
+  const assetOptions = linkedAssets.map((a) => ({
+    value: a.id,
+    label: `${a.name}${a.asset_tag ? ` (${a.asset_tag})` : ''}`,
+  }))
 
   const [form, setForm] = useState({
     performed_by: '',
@@ -56,12 +72,16 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
       setError('Performed by and description are required.')
       return
     }
+    if (!selectedAssetId) {
+      setError('Please select an asset for this PM record.')
+      return
+    }
     setLoading(true)
     setError('')
 
     // Insert maintenance record
     const recordPayload = {
-      asset_id: contract.asset_id,
+      asset_id: selectedAssetId,
       maintenance_plan_id: null,
       performed_by: form.performed_by,
       performed_date: form.performed_date,
@@ -87,7 +107,7 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
     // Also add as a service report
     await supabase.from('service_reports').insert({
       service_contract_id: contract.id,
-      asset_id: contract.asset_id,
+      asset_id: selectedAssetId,
       report_date: form.performed_date,
       technician: form.performed_by,
       type: 'pm_completed',
@@ -105,6 +125,8 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
     onClose()
   }
 
+  const selectedAssetName = linkedAssets.find((a) => a.id === selectedAssetId)?.name ?? 'N/A'
+
   return (
     <Modal open={true} onClose={onClose} title="Log Preventive Maintenance" size="lg">
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -114,7 +136,7 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
 
         <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
           <p className="text-sm text-blue-700">
-            <strong>Asset:</strong> {contract.assets?.name ?? 'N/A'} • <strong>Contract:</strong> {contract.vendor_name}
+            <strong>Contract:</strong> {contract.vendor_name}
           </p>
           <p className="text-xs text-blue-600 mt-1">
             PM interval: every {contract.pm_interval_months} month{contract.pm_interval_months !== 1 ? 's' : ''}
@@ -122,6 +144,23 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {linkedAssets.length > 1 ? (
+            <div className="sm:col-span-2">
+              <Select
+                label="Equipment *"
+                value={selectedAssetId}
+                onChange={(e) => setSelectedAssetId(e.target.value)}
+                options={assetOptions}
+              />
+            </div>
+          ) : (
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Equipment</label>
+              <p className="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+                {selectedAssetName}
+              </p>
+            </div>
+          )}
           <Input label="Performed By *" value={form.performed_by} onChange={set('performed_by')} placeholder="Technician name" />
           <Input label="Date Performed *" type="date" value={form.performed_date} onChange={set('performed_date')} />
           <Select label="Status" value={form.status} onChange={set('status')} options={STATUS_OPTIONS} />
