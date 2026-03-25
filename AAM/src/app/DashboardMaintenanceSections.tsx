@@ -29,7 +29,7 @@ interface ServiceContractPM {
   pm_interval_months: number
   next_pm_date: string
   days_left: number
-  assets: { name: string; asset_tag: string } | null
+  asset_names: string
 }
 
 export default function DashboardMaintenanceSections() {
@@ -58,7 +58,7 @@ export default function DashboardMaintenanceSections() {
       // Fetch active service contracts with PM tracking data
       supabase
         .from('service_contracts')
-        .select('*, assets(name, asset_tag)')
+        .select('*, service_contract_assets(asset_id, assets(name, asset_tag))')
         .eq('status', 'active')
         .not('pm_last_performed_date', 'is', null),
     ])
@@ -71,6 +71,9 @@ export default function DashboardMaintenanceSections() {
         const lastDate = parseISO(c.pm_last_performed_date)
         const nextDate = addMonths(lastDate, c.pm_interval_months)
         const daysLeft = differenceInDays(nextDate, now)
+        const names = (c.service_contract_assets ?? [])
+          .map((sca: any) => sca.assets?.name)
+          .filter(Boolean)
         return {
           id: c.id,
           vendor_name: c.vendor_name,
@@ -80,7 +83,7 @@ export default function DashboardMaintenanceSections() {
           pm_interval_months: c.pm_interval_months,
           next_pm_date: format(nextDate, 'yyyy-MM-dd'),
           days_left: daysLeft,
-          assets: c.assets,
+          asset_names: names.length > 0 ? names.join(', ') : 'No equipment',
         }
       })
       .filter((c: ServiceContractPM) => c.next_pm_date <= format(futureDateObj, 'yyyy-MM-dd'))
@@ -234,7 +237,7 @@ export default function DashboardMaintenanceSections() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{contract.vendor_name}</p>
                     <p className="text-xs text-gray-500">
-                      {contract.assets?.name ?? 'No asset'}
+                      {contract.asset_names}
                       {' • '}
                       <span className="text-gray-400">{intervalLabel}</span>
                       {contract.contract_number && (

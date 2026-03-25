@@ -9,6 +9,11 @@ import { createClient } from '@/lib/supabase/client'
 import { addMonths, parseISO, differenceInDays, format } from 'date-fns'
 import ContractDetailModal from './ContractDetailModal'
 
+interface ContractAsset {
+  asset_id: string
+  assets: { id: string; name: string; asset_tag: string | null } | null
+}
+
 interface Contract {
   id: string
   vendor_name: string
@@ -29,7 +34,15 @@ interface Contract {
   coverage_details: string | null
   notes: string | null
   asset_id: string | null
-  assets: { name: string; asset_tag: string | null } | null
+  service_contract_assets: ContractAsset[]
+}
+
+function getAssetNames(contract: Contract): string {
+  const names = contract.service_contract_assets
+    ?.map((sca) => sca.assets?.name)
+    .filter(Boolean) as string[]
+  if (names && names.length > 0) return names.join(', ')
+  return 'No equipment linked'
 }
 
 function getPmStatus(contract: Contract): { label: string; nextDate: string; color: string } | null {
@@ -59,11 +72,12 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null)
 
   const filtered = contracts.filter((c) => {
+    const assetNamesStr = getAssetNames(c).toLowerCase()
     const matchSearch =
       search === '' ||
       c.vendor_name.toLowerCase().includes(search.toLowerCase()) ||
       (c.contract_number?.toLowerCase().includes(search.toLowerCase())) ||
-      (c.assets?.name?.toLowerCase().includes(search.toLowerCase()))
+      assetNamesStr.includes(search.toLowerCase())
     const matchStatus = statusFilter === 'all' || c.status === statusFilter
     return matchSearch && matchStatus
   })
@@ -112,7 +126,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Vendor / Asset</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Vendor / Equipment</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Period</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Expiry</th>
@@ -126,6 +140,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
               {filtered.map((contract) => {
                 const badge = dueStatusBadge(contract.end_date)
                 const pm = getPmStatus(contract)
+                const assetDisplay = getAssetNames(contract)
                 return (
                   <tr key={contract.id} className="hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => setSelectedContract(contract)}>
                     <td className="px-6 py-4">
@@ -133,7 +148,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                         <div>
                           <p className="text-sm font-medium text-gray-900">{contract.vendor_name}</p>
                           <p className="text-xs text-gray-500">
-                            {contract.assets?.name ?? 'No asset linked'}
+                            {assetDisplay}
                             {contract.contract_number && ` • #${contract.contract_number}`}
                           </p>
                         </div>
