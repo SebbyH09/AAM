@@ -19,6 +19,11 @@ export interface Database {
         Insert: Omit<ServiceContract, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<ServiceContract, 'id' | 'created_at' | 'updated_at'>>
       }
+      contract_items: {
+        Row: ContractItem
+        Insert: Omit<ContractItem, 'id' | 'created_at'>
+        Update: Partial<Omit<ContractItem, 'id' | 'created_at'>>
+      }
       maintenance_plans: {
         Row: MaintenancePlan
         Insert: Omit<MaintenancePlan, 'id' | 'created_at' | 'updated_at'>
@@ -98,6 +103,17 @@ export interface ServiceContract {
   notes: string | null
   created_at: string
   updated_at: string
+}
+
+export interface ContractItem {
+  id: string
+  service_contract_id: string
+  description: string
+  quantity: number
+  unit_cost: number | null
+  total_cost: number | null
+  notes: string | null
+  created_at: string
 }
 
 export interface MaintenancePlan {

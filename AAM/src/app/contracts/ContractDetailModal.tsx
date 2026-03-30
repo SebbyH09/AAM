@@ -35,6 +35,15 @@ interface Contract {
   assets: { name: string; asset_tag: string | null } | null
 }
 
+interface ContractItem {
+  id: string
+  description: string
+  quantity: number
+  unit_cost: number | null
+  total_cost: number | null
+  notes: string | null
+}
+
 interface ServiceReport {
   id: string
   report_date: string
@@ -73,6 +82,8 @@ function getPmInfo(contract: Contract) {
 
 export default function ContractDetailModal({ contract, onClose }: ContractDetailModalProps) {
   const supabase = createClient()
+  const [contractItems, setContractItems] = useState<ContractItem[]>([])
+  const [loadingItems, setLoadingItems] = useState(true)
   const [reports, setReports] = useState<ServiceReport[]>([])
   const [loadingReports, setLoadingReports] = useState(true)
   const [showAddReport, setShowAddReport] = useState(false)
@@ -87,7 +98,19 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
 
   useEffect(() => {
     loadReports()
+    loadItems()
   }, [contract.id])
+
+  async function loadItems() {
+    setLoadingItems(true)
+    const { data } = await supabase
+      .from('contract_items')
+      .select('id, description, quantity, unit_cost, total_cost, notes')
+      .eq('service_contract_id', contract.id)
+      .order('created_at')
+    setContractItems(data ?? [])
+    setLoadingItems(false)
+  }
 
   async function loadReports() {
     setLoadingReports(true)
@@ -180,6 +203,43 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
                 </div>
               )}
             </div>
+
+            {/* Contract Items */}
+            {loadingItems ? (
+              <p className="text-sm text-gray-400">Loading items...</p>
+            ) : contractItems.length > 0 && (
+              <div>
+                <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-3">
+                  <ClipboardList className="h-4 w-4" />
+                  Contract Items ({contractItems.length})
+                </h4>
+                <div className="rounded-lg border border-gray-200 overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-100">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Description</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Qty</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Unit Cost</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {contractItems.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2">
+                            <p className="text-sm text-gray-700">{item.description}</p>
+                            {item.notes && <p className="text-xs text-gray-400">{item.notes}</p>}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-600 text-right">{item.quantity}</td>
+                          <td className="px-4 py-2 text-sm text-gray-600 text-right">{formatCurrency(item.unit_cost)}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700 text-right font-medium">{formatCurrency(item.total_cost)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* PM Status Section */}
             <div className="rounded-lg border border-gray-200 p-4">

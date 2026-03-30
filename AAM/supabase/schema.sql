@@ -47,6 +47,20 @@ create table service_contracts (
   updated_at timestamptz default now()
 );
 
+-- Contract items (line items within a service contract)
+create table contract_items (
+  id uuid primary key default uuid_generate_v4(),
+  service_contract_id uuid references service_contracts(id) on delete cascade not null,
+  description text not null,
+  quantity integer not null default 1,
+  unit_cost numeric(12,2),
+  total_cost numeric(12,2),
+  notes text,
+  created_at timestamptz default now()
+);
+
+create index idx_contract_items_contract_id on contract_items(service_contract_id);
+
 -- Maintenance plans
 create table maintenance_plans (
   id uuid primary key default uuid_generate_v4(),
