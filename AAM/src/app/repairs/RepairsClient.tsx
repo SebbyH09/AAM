@@ -67,7 +67,7 @@ export default function RepairsClient({ repairs }: RepairsClientProps) {
             className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-3 flex-wrap">
           <div className="flex gap-1">
             {STATUS_FILTERS.map((s) => (
               <button
@@ -78,6 +78,19 @@ export default function RepairsClient({ repairs }: RepairsClientProps) {
                 }`}
               >
                 {s.replace('_', ' ')}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1">
+            {PRIORITY_FILTERS.map((p) => (
+              <button
+                key={p}
+                onClick={() => setPriorityFilter(p)}
+                className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
+                  priorityFilter === p ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {p}
               </button>
             ))}
           </div>

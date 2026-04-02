@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Modal } from '@/components/ui/Modal'
 import { Input, Select } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { Bell, Plus, Send, Trash2, CheckCircle, XCircle } from 'lucide-react'
+import { Bell, Plus, Send, Trash2, CheckCircle, XCircle, Search } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 import { NotificationRule, NotificationLog } from '@/types/database'
 
@@ -22,6 +22,9 @@ const TYPE_OPTIONS = [
   { value: 'repair_overdue', label: 'Repair Overdue' },
   { value: 'inspection_due', label: 'Inspection Due' },
 ]
+
+const TYPE_FILTERS = ['all', 'contract_expiry', 'maintenance_due', 'repair_overdue', 'inspection_due']
+const LOG_STATUS_FILTERS = ['all', 'sent', 'failed']
 
 export default function NotificationsClient({ rules: initialRules, logs }: NotificationsClientProps) {
   const router = useRouter()
@@ -38,6 +41,34 @@ export default function NotificationsClient({ rules: initialRules, logs }: Notif
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // Filter state
+  const [ruleSearch, setRuleSearch] = useState('')
+  const [ruleTypeFilter, setRuleTypeFilter] = useState('all')
+  const [logSearch, setLogSearch] = useState('')
+  const [logStatusFilter, setLogStatusFilter] = useState('all')
+
+  const filteredRules = useMemo(() => {
+    return rules.filter((r) => {
+      const matchSearch =
+        ruleSearch === '' ||
+        r.name.toLowerCase().includes(ruleSearch.toLowerCase()) ||
+        r.email_to.some((e) => e.toLowerCase().includes(ruleSearch.toLowerCase()))
+      const matchType = ruleTypeFilter === 'all' || r.type === ruleTypeFilter
+      return matchSearch && matchType
+    })
+  }, [rules, ruleSearch, ruleTypeFilter])
+
+  const filteredLogs = useMemo(() => {
+    return logs.filter((l) => {
+      const matchSearch =
+        logSearch === '' ||
+        l.subject.toLowerCase().includes(logSearch.toLowerCase()) ||
+        l.recipient.toLowerCase().includes(logSearch.toLowerCase())
+      const matchStatus = logStatusFilter === 'all' || l.status === logStatusFilter
+      return matchSearch && matchStatus
+    })
+  }, [logs, logSearch, logStatusFilter])
 
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }))
@@ -120,11 +151,41 @@ export default function NotificationsClient({ rules: initialRules, logs }: Notif
             <code className="bg-gray-100 px-1 rounded text-xs">/api/notifications/send</code>
           </p>
         </div>
+
+        {/* Rule Filters */}
+        <div className="border-b border-gray-100 px-6 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search rules..."
+              value={ruleSearch}
+              onChange={(e) => setRuleSearch(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 py-1.5 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex gap-1 flex-wrap">
+            {TYPE_FILTERS.map((t) => (
+              <button
+                key={t}
+                onClick={() => setRuleTypeFilter(t)}
+                className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
+                  ruleTypeFilter === t ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {t.replace(/_/g, ' ')}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="divide-y divide-gray-100">
-          {rules.length === 0 ? (
-            <p className="px-6 py-8 text-center text-sm text-gray-400">No notification rules configured.</p>
+          {filteredRules.length === 0 ? (
+            <p className="px-6 py-8 text-center text-sm text-gray-400">
+              {rules.length === 0 ? 'No notification rules configured.' : 'No rules match your filters.'}
+            </p>
           ) : (
-            rules.map((rule) => (
+            filteredRules.map((rule) => (
               <div key={rule.id} className="flex items-center justify-between px-6 py-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -170,11 +231,41 @@ export default function NotificationsClient({ rules: initialRules, logs }: Notif
           <h2 className="font-semibold text-gray-900">Notification History</h2>
           <p className="mt-1 text-sm text-gray-500">Recent notifications sent (last 50)</p>
         </div>
+
+        {/* Log Filters */}
+        <div className="border-b border-gray-100 px-6 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search logs..."
+              value={logSearch}
+              onChange={(e) => setLogSearch(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 py-1.5 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex gap-1 flex-wrap">
+            {LOG_STATUS_FILTERS.map((s) => (
+              <button
+                key={s}
+                onClick={() => setLogStatusFilter(s)}
+                className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
+                  logStatusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="divide-y divide-gray-100">
-          {logs.length === 0 ? (
-            <p className="px-6 py-8 text-center text-sm text-gray-400">No notifications sent yet.</p>
+          {filteredLogs.length === 0 ? (
+            <p className="px-6 py-8 text-center text-sm text-gray-400">
+              {logs.length === 0 ? 'No notifications sent yet.' : 'No logs match your filters.'}
+            </p>
           ) : (
-            logs.map((log) => (
+            filteredLogs.map((log) => (
               <div key={log.id} className="flex items-center justify-between px-6 py-3">
                 <div className="flex items-center gap-3">
                   {log.status === 'sent' ? (
