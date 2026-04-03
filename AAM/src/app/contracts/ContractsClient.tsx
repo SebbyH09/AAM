@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge } from '@/lib/utils'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Search, FileText, ChevronRight, Paperclip, Wrench } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { addMonths, parseISO, differenceInDays, format } from 'date-fns'
@@ -53,6 +54,7 @@ interface ContractsClientProps {
 const STATUS_FILTERS = ['all', 'active', 'expired', 'pending']
 
 export default function ContractsClient({ contracts }: ContractsClientProps) {
+  const router = useRouter()
   const supabase = createClient()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -205,6 +207,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
         <ContractDetailModal
           contract={selectedContract}
           onClose={() => setSelectedContract(null)}
+          onDeleted={() => { setSelectedContract(null); router.refresh() }}
         />
       )}
     </div>

@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { formatDate, formatCurrency, statusColor } from '@/lib/utils'
-import { X, FileText, Wrench, Plus, ClipboardList } from 'lucide-react'
+import { X, FileText, Wrench, Plus, ClipboardList, Trash2, XCircle } from 'lucide-react'
 import { addMonths, parseISO, differenceInDays, format } from 'date-fns'
 import Link from 'next/link'
 import AddServiceReportModal from './AddServiceReportModal'
@@ -64,6 +64,7 @@ interface ServiceReport {
 interface ContractDetailModalProps {
   contract: Contract
   onClose: () => void
+  onDeleted?: () => void
 }
 
 function getPmInfo(contract: Contract) {
@@ -83,7 +84,8 @@ function getPmInfo(contract: Contract) {
   return { label, nextDate: nextFormatted, color, daysLeft }
 }
 
-export default function ContractDetailModal({ contract, onClose }: ContractDetailModalProps) {
+export default function ContractDetailModal({ contract, onClose, onDeleted }: ContractDetailModalProps) {
+  const router = useRouter()
   const supabase = createClient()
   const [contractItems, setContractItems] = useState<ContractItem[]>([])
   const [loadingItems, setLoadingItems] = useState(true)
@@ -92,6 +94,10 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
   const [showAddReport, setShowAddReport] = useState(false)
   const [showLogPm, setShowLogPm] = useState(false)
   const [selectedReport, setSelectedReport] = useState<ServiceReport | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deactivating, setDeactivating] = useState(false)
+  const [actionError, setActionError] = useState('')
 
   const pm = getPmInfo(contract)
 
@@ -140,6 +146,35 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
       .from('service-reports')
       .createSignedUrl(filePath, 60)
     if (!error && data) window.open(data.signedUrl, '_blank')
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    setActionError('')
+    const { error } = await supabase.from('service_contracts').delete().eq('id', contract.id)
+    if (error) {
+      setActionError(error.message)
+      setDeleting(false)
+      return
+    }
+    onClose()
+    if (onDeleted) onDeleted()
+    router.refresh()
+  }
+
+  async function handleDeactivate() {
+    setDeactivating(true)
+    setActionError('')
+    const newStatus = contract.status === 'active' ? 'expired' : 'active'
+    const { error } = await supabase.from('service_contracts').update({ status: newStatus }).eq('id', contract.id)
+    if (error) {
+      setActionError(error.message)
+      setDeactivating(false)
+      return
+    }
+    onClose()
+    if (onDeleted) onDeleted()
+    router.refresh()
   }
 
   return (
@@ -368,7 +403,10 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3 pt-2 border-t border-gray-100">
+            {actionError && (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{actionError}</div>
+            )}
+            <div className="flex gap-3 pt-2 border-t border-gray-100 flex-wrap">
               {contract.asset_id && (
                 <Button onClick={() => setShowLogPm(true)}>
                   <Wrench className="mr-2 h-4 w-4" />
@@ -385,7 +423,32 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
               >
                 Edit Contract
               </Link>
+              <Button variant="outline" loading={deactivating} onClick={handleDeactivate}>
+                <XCircle className="mr-2 h-4 w-4" />
+                {contract.status === 'active' ? 'Deactivate' : 'Reactivate'}
+              </Button>
+              <Button variant="danger" onClick={() => setShowDeleteConfirm(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
             </div>
+
+            {/* Delete Confirmation */}
+            {showDeleteConfirm && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4 space-y-3">
+                <p className="text-sm text-red-700">
+                  Are you sure you want to delete the contract for <strong>{contract.vendor_name}</strong>? This will also delete all associated contract items and service reports. This action cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                  <Button variant="danger" loading={deleting} onClick={handleDelete}>
+                    Delete Contract
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
