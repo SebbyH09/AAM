@@ -194,6 +194,9 @@ export interface ServiceReport {
   cost: number | null
   status: string
   notes: string | null
+  file_path: string | null
+  file_name: string | null
+  file_url: string | null
   created_at: string
 }
 

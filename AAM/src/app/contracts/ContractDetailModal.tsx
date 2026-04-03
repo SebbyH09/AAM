@@ -56,6 +56,8 @@ interface ServiceReport {
   labor_hours: number | null
   cost: number | null
   status: string
+  file_path: string | null
+  file_name: string | null
 }
 
 interface ContractDetailModalProps {
@@ -116,7 +118,7 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
     setLoadingReports(true)
     const { data } = await supabase
       .from('service_reports')
-      .select('id, report_date, technician, type, summary, findings, recommendations, parts_used, labor_hours, cost, status')
+      .select('id, report_date, technician, type, summary, findings, recommendations, parts_used, labor_hours, cost, status, file_path, file_name')
       .eq('service_contract_id', contract.id)
       .order('report_date', { ascending: false })
     setReports(data ?? [])
@@ -128,6 +130,13 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
     const { data, error } = await supabase.storage
       .from('contracts')
       .createSignedUrl(contract.file_path, 60)
+    if (!error && data) window.open(data.signedUrl, '_blank')
+  }
+
+  async function openReportFile(filePath: string) {
+    const { data, error } = await supabase.storage
+      .from('service-reports')
+      .createSignedUrl(filePath, 60)
     if (!error && data) window.open(data.signedUrl, '_blank')
   }
 
@@ -315,6 +324,7 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Summary</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Status</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Cost</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">File</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -334,6 +344,19 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
                             </Badge>
                           </td>
                           <td className="px-4 py-2 text-sm text-gray-600">{formatCurrency(r.cost)}</td>
+                          <td className="px-4 py-2">
+                            {r.file_path && r.file_name ? (
+                              <button
+                                onClick={() => openReportFile(r.file_path!)}
+                                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                              >
+                                <FileText className="h-3 w-3" />
+                                {r.file_name}
+                              </button>
+                            ) : (
+                              <span className="text-xs text-gray-400">—</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
