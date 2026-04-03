@@ -11,6 +11,7 @@ import { addMonths, parseISO, differenceInDays, format } from 'date-fns'
 import Link from 'next/link'
 import AddServiceReportModal from './AddServiceReportModal'
 import LogContractPmModal from './LogContractPmModal'
+import ServiceReportDetailModal from './ServiceReportDetailModal'
 
 interface Contract {
   id: string
@@ -90,6 +91,7 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
   const [loadingReports, setLoadingReports] = useState(true)
   const [showAddReport, setShowAddReport] = useState(false)
   const [showLogPm, setShowLogPm] = useState(false)
+  const [selectedReport, setSelectedReport] = useState<ServiceReport | null>(null)
 
   const pm = getPmInfo(contract)
 
@@ -329,7 +331,7 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {reports.map((r) => (
-                        <tr key={r.id} className="hover:bg-gray-50">
+                        <tr key={r.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedReport(r)}>
                           <td className="px-4 py-2 text-sm text-gray-700">{formatDate(r.report_date)}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">{r.technician}</td>
                           <td className="px-4 py-2 text-sm text-gray-600 capitalize">{r.type.replace(/_/g, ' ')}</td>
@@ -347,7 +349,7 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
                           <td className="px-4 py-2">
                             {r.file_path && r.file_name ? (
                               <button
-                                onClick={() => openReportFile(r.file_path!)}
+                                onClick={(e) => { e.stopPropagation(); openReportFile(r.file_path!) }}
                                 className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
                               >
                                 <FileText className="h-3 w-3" />
@@ -402,6 +404,13 @@ export default function ContractDetailModal({ contract, onClose }: ContractDetai
         <LogContractPmModal
           contract={contract}
           onClose={() => setShowLogPm(false)}
+        />
+      )}
+
+      {selectedReport && (
+        <ServiceReportDetailModal
+          report={selectedReport}
+          onClose={() => setSelectedReport(null)}
         />
       )}
     </>
