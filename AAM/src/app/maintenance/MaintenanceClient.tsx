@@ -4,8 +4,10 @@ import { useState, useMemo, useEffect } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge, getDueStatus } from '@/lib/utils'
 import Link from 'next/link'
-import { Search, ClipboardList, CheckCircle2, AlertTriangle, Plus, Minus, Clock, MapPin, ChevronRight, Package, X } from 'lucide-react'
+import { Search, ClipboardList, CheckCircle2, AlertTriangle, Plus, Minus, Clock, MapPin, ChevronRight, Package, X, Trash2, XCircle, Power } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/Button'
 import LogMaintenanceModal from './LogMaintenanceModal'
 import AddServiceReportModal from '../contracts/AddServiceReportModal'
 
@@ -57,7 +59,12 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
   const [showAddReport, setShowAddReport] = useState(false)
   const [planReports, setPlanReports] = useState<any[]>([])
   const [loadingReports, setLoadingReports] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deactivating, setDeactivating] = useState(false)
+  const [actionError, setActionError] = useState('')
   const supabase = createClient()
+  const router = useRouter()
 
   useEffect(() => {
     if (detailPlan) {
@@ -76,6 +83,50 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
       .order('report_date', { ascending: false })
     setPlanReports(data ?? [])
     setLoadingReports(false)
+  }
+
+  async function handleDeletePlan() {
+    if (!detailPlan) return
+    setDeleting(true)
+    setActionError('')
+    const { error } = await supabase.from('maintenance_plans').delete().eq('id', detailPlan.id)
+    if (error) {
+      setActionError(error.message)
+      setDeleting(false)
+      return
+    }
+    setDetailPlan(null)
+    setShowDeleteConfirm(false)
+    router.refresh()
+  }
+
+  async function handleToggleActive() {
+    if (!detailPlan) return
+    setDeactivating(true)
+    setActionError('')
+    const { error } = await supabase.from('maintenance_plans').update({ is_active: !detailPlan.is_active }).eq('id', detailPlan.id)
+    if (error) {
+      setActionError(error.message)
+      setDeactivating(false)
+      return
+    }
+    setDetailPlan(null)
+    router.refresh()
+  }
+
+  async function handleRemovePart(partIndex: number) {
+    if (!detailPlan || !detailPlan.parts) return
+    const updatedParts = detailPlan.parts.filter((_, i) => i !== partIndex)
+    const { error } = await supabase
+      .from('maintenance_plans')
+      .update({ parts: updatedParts.length > 0 ? updatedParts : null })
+      .eq('id', detailPlan.id)
+    if (error) {
+      setActionError(error.message)
+      return
+    }
+    setDetailPlan({ ...detailPlan, parts: updatedParts.length > 0 ? updatedParts : null })
+    router.refresh()
   }
 
   const filtered = plans.filter((p) => {
@@ -492,6 +543,7 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Part Name</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Qty</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Part #</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500"><span className="sr-only">Remove</span></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -500,6 +552,15 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                             <td className="px-4 py-2 text-sm text-gray-700">{part.name}</td>
                             <td className="px-4 py-2 text-sm text-gray-600">{part.quantity ?? 1}</td>
                             <td className="px-4 py-2 text-sm text-gray-500">{part.part_number ?? '—'}</td>
+                            <td className="px-4 py-2 text-right">
+                              <button
+                                onClick={() => handleRemovePart(i)}
+                                className="p-1 text-red-400 hover:text-red-600"
+                                title="Remove part"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -573,7 +634,10 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3 pt-2 border-t border-gray-100">
+              {actionError && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{actionError}</div>
+              )}
+              <div className="flex gap-3 pt-2 border-t border-gray-100 flex-wrap">
                 <button
                   onClick={() => { setDetailPlan(null); setLoggingPlan(detailPlan) }}
                   className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
@@ -594,7 +658,32 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                 >
                   Edit Plan
                 </Link>
+                <Button variant="outline" loading={deactivating} onClick={handleToggleActive}>
+                  <Power className="mr-2 h-4 w-4" />
+                  {detailPlan.is_active ? 'Deactivate' : 'Reactivate'}
+                </Button>
+                <Button variant="danger" onClick={() => setShowDeleteConfirm(true)}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
               </div>
+
+              {/* Delete Confirmation */}
+              {showDeleteConfirm && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 space-y-3">
+                  <p className="text-sm text-red-700">
+                    Are you sure you want to delete <strong>{detailPlan.name}</strong>? This action cannot be undone.
+                  </p>
+                  <div className="flex gap-3">
+                    <Button variant="danger" loading={deleting} onClick={handleDeletePlan}>
+                      Delete Plan
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

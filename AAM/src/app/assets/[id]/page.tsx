@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Edit, Plus, FileText, Wrench, ClipboardList, Clock } from 'lucide-react'
 import DeleteAssetButton from './DeleteAssetButton'
+import DeactivateAssetButton from './DeactivateAssetButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,6 +53,7 @@ export default async function AssetDetailPage({ params }: PageProps) {
               <Edit className="h-4 w-4" />
               Edit
             </Link>
+            <DeactivateAssetButton assetId={id} assetName={asset.name} currentStatus={asset.status} />
             <DeleteAssetButton assetId={id} assetName={asset.name} />
           </div>
         }
