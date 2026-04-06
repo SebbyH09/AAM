@@ -10,6 +10,11 @@ import { createClient } from '@/lib/supabase/client'
 import { addMonths, parseISO, differenceInDays, format } from 'date-fns'
 import ContractDetailModal from './ContractDetailModal'
 
+interface LinkedAsset {
+  asset_id: string
+  assets: { id: string; name: string; asset_tag: string | null; serial_number: string | null; model: string | null } | null
+}
+
 interface Contract {
   id: string
   vendor_name: string
@@ -31,6 +36,24 @@ interface Contract {
   notes: string | null
   asset_id: string | null
   assets: { name: string; asset_tag: string | null; serial_number: string | null; model: string | null } | null
+  service_contract_assets?: LinkedAsset[]
+}
+
+function getLinkedAssetNames(contract: Contract): string {
+  const linked = contract.service_contract_assets?.filter((la) => la.assets) ?? []
+  if (linked.length > 0) {
+    return linked.map((la) => la.assets!.name).join(', ')
+  }
+  // Fallback to legacy asset_id
+  return contract.assets?.name ?? 'No assets linked'
+}
+
+function getLinkedAssetIds(contract: Contract): string[] {
+  const linked = contract.service_contract_assets?.filter((la) => la.assets) ?? []
+  if (linked.length > 0) {
+    return linked.map((la) => la.asset_id)
+  }
+  return contract.asset_id ? [contract.asset_id] : []
 }
 
 function getPmStatus(contract: Contract): { label: string; nextDate: string; color: string } | null {
@@ -61,13 +84,15 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null)
 
   const filtered = contracts.filter((c) => {
+    const q = search.toLowerCase()
+    const assetNames = getLinkedAssetNames(c).toLowerCase()
     const matchSearch =
       search === '' ||
-      c.vendor_name.toLowerCase().includes(search.toLowerCase()) ||
-      (c.contract_number?.toLowerCase().includes(search.toLowerCase())) ||
-      (c.assets?.name?.toLowerCase().includes(search.toLowerCase())) ||
-      (c.assets?.serial_number?.toLowerCase().includes(search.toLowerCase())) ||
-      (c.assets?.model?.toLowerCase().includes(search.toLowerCase()))
+      c.vendor_name.toLowerCase().includes(q) ||
+      (c.contract_number?.toLowerCase().includes(q)) ||
+      assetNames.includes(q) ||
+      (c.assets?.serial_number?.toLowerCase().includes(q)) ||
+      (c.assets?.model?.toLowerCase().includes(q))
     const matchStatus = statusFilter === 'all' || c.status === statusFilter
     return matchSearch && matchStatus
   })
@@ -116,7 +141,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Asset / Vendor</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Assets / Vendor</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Period</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Expiry</th>
@@ -130,13 +155,14 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
               {filtered.map((contract) => {
                 const badge = dueStatusBadge(contract.end_date)
                 const pm = getPmStatus(contract)
+                const assetNames = getLinkedAssetNames(contract)
                 return (
                   <tr key={contract.id} className="hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => setSelectedContract(contract)}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <div>
                           <p className="text-sm font-medium text-gray-900">
-                            {contract.assets?.name ?? 'No asset linked'}
+                            {assetNames}
                             {contract.contract_number && <span className="text-gray-400 font-normal"> • #{contract.contract_number}</span>}
                           </p>
                           <p className="text-xs text-gray-500">{contract.vendor_name}</p>

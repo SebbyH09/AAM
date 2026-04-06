@@ -16,9 +16,9 @@ export default async function NewContractPage({ searchParams }: PageProps) {
 
   return (
     <div>
-      <Header title="Add Service Contract" subtitle="Attach a service contract to an asset" />
+      <Header title="Add Service Contract" subtitle="Attach a service contract to assets" />
       <div className="p-6">
-        <ContractForm assets={assets ?? []} defaultAssetId={asset_id} />
+        <ContractForm assets={assets ?? []} defaultAssetIds={asset_id ? [asset_id] : []} />
       </div>
     </div>
   )

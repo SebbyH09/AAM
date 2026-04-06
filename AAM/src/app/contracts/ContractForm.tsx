@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { ServiceContract } from '@/types/database'
-import { Upload, X, Plus, Trash2 } from 'lucide-react'
+import { Upload, X, Search, Check } from 'lucide-react'
 
 interface Asset {
   id: string
@@ -14,18 +14,10 @@ interface Asset {
   asset_tag: string | null
 }
 
-interface ContractItemRow {
-  id?: string
-  description: string
-  quantity: string
-  unit_cost: string
-  notes: string
-}
-
 interface ContractFormProps {
   assets: Asset[]
   contract?: ServiceContract
-  defaultAssetId?: string
+  defaultAssetIds?: string[]
   existingItems?: { id: string; description: string; quantity: number; unit_cost: number | null; notes: string | null }[]
 }
 
@@ -42,7 +34,7 @@ const STATUS_OPTIONS = [
   { value: 'expired', label: 'Expired' },
 ]
 
-export default function ContractForm({ assets, contract, defaultAssetId, existingItems }: ContractFormProps) {
+export default function ContractForm({ assets, contract, defaultAssetIds }: ContractFormProps) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
@@ -50,29 +42,37 @@ export default function ContractForm({ assets, contract, defaultAssetId, existin
   const [file, setFile] = useState<File | null>(null)
   const [uploadProgress, setUploadProgress] = useState(false)
 
-  const [items, setItems] = useState<ContractItemRow[]>(
-    existingItems?.map((item) => ({
-      id: item.id,
-      description: item.description,
-      quantity: item.quantity.toString(),
-      unit_cost: item.unit_cost?.toString() ?? '',
-      notes: item.notes ?? '',
-    })) ?? []
-  )
+  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>(defaultAssetIds ?? [])
+  const [assetSearch, setAssetSearch] = useState('')
+  const [assetDropdownOpen, setAssetDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const addItem = () => setItems((prev) => [...prev, { description: '', quantity: '1', unit_cost: '', notes: '' }])
-  const removeItem = (index: number) => setItems((prev) => prev.filter((_, i) => i !== index))
-  const updateItem = (index: number, field: keyof ContractItemRow, value: string) => {
-    setItems((prev) => prev.map((item, i) => i === index ? { ...item, [field]: value } : item))
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setAssetDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const filteredAssets = assets.filter((a) => {
+    const q = assetSearch.toLowerCase()
+    return !q || a.name.toLowerCase().includes(q) || (a.asset_tag?.toLowerCase().includes(q) ?? false)
+  })
+
+  function toggleAsset(assetId: string) {
+    setSelectedAssetIds((prev) =>
+      prev.includes(assetId) ? prev.filter((id) => id !== assetId) : [...prev, assetId]
+    )
   }
 
-  const assetOptions = [
-    { value: '', label: 'No asset linked' },
-    ...assets.map((a) => ({ value: a.id, label: `${a.name}${a.asset_tag ? ` (${a.asset_tag})` : ''}` })),
-  ]
+  function removeAsset(assetId: string) {
+    setSelectedAssetIds((prev) => prev.filter((id) => id !== assetId))
+  }
 
   const [form, setForm] = useState({
-    asset_id: contract?.asset_id ?? defaultAssetId ?? '',
     contract_number: contract?.contract_number ?? '',
     vendor_name: contract?.vendor_name ?? '',
     vendor_contact: contract?.vendor_contact ?? '',
@@ -115,7 +115,7 @@ export default function ContractForm({ assets, contract, defaultAssetId, existin
     setError('')
 
     const payload: any = {
-      asset_id: form.asset_id || null,
+      asset_id: selectedAssetIds.length > 0 ? selectedAssetIds[0] : null,
       contract_number: form.contract_number || null,
       vendor_name: form.vendor_name,
       vendor_contact: form.vendor_contact || null,
@@ -143,46 +143,24 @@ export default function ContractForm({ assets, contract, defaultAssetId, existin
       contractId = data.id
     }
 
-    // Save contract items
+    // Save asset links to junction table
     if (contractId) {
-      // Delete existing items that were removed
-      if (contract) {
-        const keepIds = items.filter((item) => item.id).map((item) => item.id!)
-        if (keepIds.length > 0) {
-          await supabase.from('contract_items').delete().eq('service_contract_id', contractId).not('id', 'in', `(${keepIds.join(',')})`)
-        } else {
-          await supabase.from('contract_items').delete().eq('service_contract_id', contractId)
-        }
-        // Update existing items
-        for (const item of items.filter((i) => i.id)) {
-          const qty = parseInt(item.quantity) || 1
-          const unitCost = item.unit_cost ? parseFloat(item.unit_cost) : null
-          await supabase.from('contract_items').update({
-            description: item.description,
-            quantity: qty,
-            unit_cost: unitCost,
-            total_cost: unitCost ? unitCost * qty : null,
-            notes: item.notes || null,
-          }).eq('id', item.id!)
-        }
-      }
-      // Insert new items
-      const newItems = items.filter((i) => !i.id && i.description.trim())
-      if (newItems.length > 0) {
-        await supabase.from('contract_items').insert(
-          newItems.map((item) => {
-            const qty = parseInt(item.quantity) || 1
-            const unitCost = item.unit_cost ? parseFloat(item.unit_cost) : null
-            return {
-              service_contract_id: contractId,
-              description: item.description,
-              quantity: qty,
-              unit_cost: unitCost,
-              total_cost: unitCost ? unitCost * qty : null,
-              notes: item.notes || null,
-            }
-          })
+      // Remove all existing links
+      await supabase.from('service_contract_assets').delete().eq('service_contract_id', contractId)
+
+      // Insert new links
+      if (selectedAssetIds.length > 0) {
+        const { error: linkError } = await supabase.from('service_contract_assets').insert(
+          selectedAssetIds.map((assetId) => ({
+            service_contract_id: contractId!,
+            asset_id: assetId,
+          }))
         )
+        if (linkError) {
+          setError(linkError.message)
+          setLoading(false)
+          return
+        }
       }
     }
 
@@ -208,6 +186,8 @@ export default function ContractForm({ assets, contract, defaultAssetId, existin
     router.refresh()
   }
 
+  const selectedAssets = assets.filter((a) => selectedAssetIds.includes(a.id))
+
   return (
     <div className="max-w-2xl">
       <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-6">
@@ -216,9 +196,84 @@ export default function ContractForm({ assets, contract, defaultAssetId, existin
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Multi-Asset Selector */}
           <div className="sm:col-span-2">
-            <Select label="Linked Asset" value={form.asset_id} onChange={set('asset_id')} options={assetOptions} />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Linked Assets</label>
+
+            {/* Selected assets tags */}
+            {selectedAssets.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {selectedAssets.map((asset) => (
+                  <span
+                    key={asset.id}
+                    className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-700"
+                  >
+                    {asset.name}{asset.asset_tag ? ` (${asset.asset_tag})` : ''}
+                    <button
+                      type="button"
+                      onClick={() => removeAsset(asset.id)}
+                      className="ml-1 rounded-full p-0.5 hover:bg-blue-200 text-blue-500 hover:text-blue-700"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Dropdown trigger / search */}
+            <div ref={dropdownRef} className="relative">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search and select assets..."
+                  value={assetSearch}
+                  onChange={(e) => { setAssetSearch(e.target.value); setAssetDropdownOpen(true) }}
+                  onFocus={() => setAssetDropdownOpen(true)}
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              {assetDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                  {filteredAssets.length === 0 ? (
+                    <p className="px-4 py-3 text-sm text-gray-500">No assets found</p>
+                  ) : (
+                    filteredAssets.map((asset) => {
+                      const isSelected = selectedAssetIds.includes(asset.id)
+                      return (
+                        <button
+                          key={asset.id}
+                          type="button"
+                          onClick={() => toggleAsset(asset.id)}
+                          className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm transition-colors ${
+                            isSelected ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                            isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                          }`}>
+                            {isSelected && <Check className="h-3 w-3 text-white" />}
+                          </div>
+                          <span>
+                            {asset.name}
+                            {asset.asset_tag && <span className="text-gray-400 ml-1">({asset.asset_tag})</span>}
+                          </span>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              {selectedAssetIds.length === 0
+                ? 'No assets linked. Search above to add assets.'
+                : `${selectedAssetIds.length} asset${selectedAssetIds.length !== 1 ? 's' : ''} selected`}
+            </p>
           </div>
+
           <Input label="Vendor Name *" value={form.vendor_name} onChange={set('vendor_name')} placeholder="e.g. Agilent Technologies" />
           <Input label="Contract Number" value={form.contract_number} onChange={set('contract_number')} placeholder="e.g. SVC-2024-001" />
           <Input label="Vendor Contact" value={form.vendor_contact} onChange={set('vendor_contact')} placeholder="Contact name" />
@@ -241,76 +296,6 @@ export default function ContractForm({ assets, contract, defaultAssetId, existin
           <Input label="PM Interval (months)" type="number" value={form.pm_interval_months} onChange={set('pm_interval_months')} placeholder="12" min="1" max="60" />
           <div className="sm:col-span-2">
             <Textarea label="Notes" value={form.notes} onChange={set('notes')} placeholder="Additional notes..." />
-          </div>
-
-          {/* Contract Items */}
-          <div className="sm:col-span-2">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-semibold text-gray-700 border-b border-gray-200 pb-1 flex-1">Contract Items</p>
-              <button type="button" onClick={addItem} className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 ml-3">
-                <Plus className="h-4 w-4" /> Add Item
-              </button>
-            </div>
-            {items.length === 0 ? (
-              <p className="text-sm text-gray-400">No items added. Click &quot;Add Item&quot; to add line items to this contract.</p>
-            ) : (
-              <div className="space-y-3">
-                {items.map((item, index) => (
-                  <div key={index} className="rounded-lg border border-gray-200 p-3 space-y-2 bg-gray-50">
-                    <div className="flex items-start gap-2">
-                      <div className="flex-1">
-                        <Input
-                          label="Description *"
-                          value={item.description}
-                          onChange={(e) => updateItem(index, 'description', e.target.value)}
-                          placeholder="e.g. Annual PM visit, Filter replacement"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeItem(index)}
-                        className="mt-6 rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
-                        title="Remove item"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Input
-                        label="Quantity"
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-                        min="1"
-                      />
-                      <Input
-                        label="Unit Cost ($)"
-                        type="number"
-                        value={item.unit_cost}
-                        onChange={(e) => updateItem(index, 'unit_cost', e.target.value)}
-                        placeholder="0.00"
-                        step="0.01"
-                        min="0"
-                      />
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Total</label>
-                        <p className="py-2 text-sm text-gray-700">
-                          {item.unit_cost && item.quantity
-                            ? `$${(parseFloat(item.unit_cost) * (parseInt(item.quantity) || 1)).toFixed(2)}`
-                            : '—'}
-                        </p>
-                      </div>
-                    </div>
-                    <Input
-                      label="Notes"
-                      value={item.notes}
-                      onChange={(e) => updateItem(index, 'notes', e.target.value)}
-                      placeholder="Optional notes for this item"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* File Upload */}

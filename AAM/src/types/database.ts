@@ -24,6 +24,11 @@ export interface Database {
         Insert: Omit<ContractItem, 'id' | 'created_at'>
         Update: Partial<Omit<ContractItem, 'id' | 'created_at'>>
       }
+      service_contract_assets: {
+        Row: ServiceContractAsset
+        Insert: Omit<ServiceContractAsset, 'id' | 'created_at'>
+        Update: Partial<Omit<ServiceContractAsset, 'id' | 'created_at'>>
+      }
       maintenance_plans: {
         Row: MaintenancePlan
         Insert: Omit<MaintenancePlan, 'id' | 'created_at' | 'updated_at'>
@@ -103,6 +108,13 @@ export interface ServiceContract {
   notes: string | null
   created_at: string
   updated_at: string
+}
+
+export interface ServiceContractAsset {
+  id: string
+  service_contract_id: string
+  asset_id: string
+  created_at: string
 }
 
 export interface ContractItem {
@@ -252,6 +264,10 @@ export interface MaintenancePlanWithAsset extends MaintenancePlan {
 
 export interface ServiceContractWithAsset extends ServiceContract {
   assets?: Asset
+}
+
+export interface ServiceContractWithAssets extends ServiceContract {
+  service_contract_assets?: (ServiceContractAsset & { assets: Asset })[]
 }
 
 export interface RepairWithAsset extends Repair {

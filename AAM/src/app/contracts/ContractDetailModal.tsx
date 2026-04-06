@@ -13,6 +13,11 @@ import AddServiceReportModal from './AddServiceReportModal'
 import LogContractPmModal from './LogContractPmModal'
 import ServiceReportDetailModal from './ServiceReportDetailModal'
 
+interface LinkedAsset {
+  asset_id: string
+  assets: { id: string; name: string; asset_tag: string | null; serial_number: string | null; model: string | null } | null
+}
+
 interface Contract {
   id: string
   vendor_name: string
@@ -34,15 +39,7 @@ interface Contract {
   notes: string | null
   asset_id: string | null
   assets: { name: string; asset_tag: string | null } | null
-}
-
-interface ContractItem {
-  id: string
-  description: string
-  quantity: number
-  unit_cost: number | null
-  total_cost: number | null
-  notes: string | null
+  service_contract_assets?: LinkedAsset[]
 }
 
 interface ServiceReport {
@@ -67,6 +64,22 @@ interface ContractDetailModalProps {
   onDeleted?: () => void
 }
 
+function getLinkedAssetNames(contract: Contract): string {
+  const linked = contract.service_contract_assets?.filter((la) => la.assets) ?? []
+  if (linked.length > 0) {
+    return linked.map((la) => la.assets!.name).join(', ')
+  }
+  return contract.assets?.name ?? 'No assets linked'
+}
+
+function getLinkedAssetIds(contract: Contract): string[] {
+  const linked = contract.service_contract_assets?.filter((la) => la.assets) ?? []
+  if (linked.length > 0) {
+    return linked.map((la) => la.asset_id)
+  }
+  return contract.asset_id ? [contract.asset_id] : []
+}
+
 function getPmInfo(contract: Contract) {
   if (!contract.pm_last_performed_date) return null
   const lastDate = parseISO(contract.pm_last_performed_date)
@@ -87,8 +100,6 @@ function getPmInfo(contract: Contract) {
 export default function ContractDetailModal({ contract, onClose, onDeleted }: ContractDetailModalProps) {
   const router = useRouter()
   const supabase = createClient()
-  const [contractItems, setContractItems] = useState<ContractItem[]>([])
-  const [loadingItems, setLoadingItems] = useState(true)
   const [reports, setReports] = useState<ServiceReport[]>([])
   const [loadingReports, setLoadingReports] = useState(true)
   const [showAddReport, setShowAddReport] = useState(false)
@@ -100,6 +111,8 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
   const [actionError, setActionError] = useState('')
 
   const pm = getPmInfo(contract)
+  const assetIds = getLinkedAssetIds(contract)
+  const hasAssets = assetIds.length > 0
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -108,19 +121,7 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
 
   useEffect(() => {
     loadReports()
-    loadItems()
   }, [contract.id])
-
-  async function loadItems() {
-    setLoadingItems(true)
-    const { data } = await supabase
-      .from('contract_items')
-      .select('id, description, quantity, unit_cost, total_cost, notes')
-      .eq('service_contract_id', contract.id)
-      .order('created_at')
-    setContractItems(data ?? [])
-    setLoadingItems(false)
-  }
 
   async function loadReports() {
     setLoadingReports(true)
@@ -177,6 +178,8 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
     router.refresh()
   }
 
+  const linkedAssets = contract.service_contract_assets?.filter((la) => la.assets) ?? []
+
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -186,7 +189,7 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
             <div>
               <h2 className="text-lg font-semibold text-gray-900">{contract.vendor_name}</h2>
               <p className="text-sm text-gray-500">
-                {contract.assets?.name ?? 'No asset linked'}
+                {getLinkedAssetNames(contract)}
                 {contract.contract_number && ` • #${contract.contract_number}`}
               </p>
             </div>
@@ -207,6 +210,21 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
                 </button>
               )}
             </div>
+
+            {/* Linked Assets */}
+            {linkedAssets.length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-2">Linked Assets ({linkedAssets.length})</h4>
+                <div className="flex flex-wrap gap-2">
+                  {linkedAssets.map((la) => (
+                    <span key={la.asset_id} className="inline-flex items-center rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-700">
+                      {la.assets!.name}
+                      {la.assets!.asset_tag && <span className="text-blue-400 ml-1">({la.assets!.asset_tag})</span>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Contract Details Grid */}
             <div className="grid grid-cols-2 gap-4">
@@ -250,43 +268,6 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
               )}
             </div>
 
-            {/* Contract Items */}
-            {loadingItems ? (
-              <p className="text-sm text-gray-400">Loading items...</p>
-            ) : contractItems.length > 0 && (
-              <div>
-                <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-3">
-                  <ClipboardList className="h-4 w-4" />
-                  Contract Items ({contractItems.length})
-                </h4>
-                <div className="rounded-lg border border-gray-200 overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-100">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Description</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Qty</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Unit Cost</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {contractItems.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2">
-                            <p className="text-sm text-gray-700">{item.description}</p>
-                            {item.notes && <p className="text-xs text-gray-400">{item.notes}</p>}
-                          </td>
-                          <td className="px-4 py-2 text-sm text-gray-600 text-right">{item.quantity}</td>
-                          <td className="px-4 py-2 text-sm text-gray-600 text-right">{formatCurrency(item.unit_cost)}</td>
-                          <td className="px-4 py-2 text-sm text-gray-700 text-right font-medium">{formatCurrency(item.total_cost)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
             {/* PM Status Section */}
             <div className="rounded-lg border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-2">
@@ -294,7 +275,7 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
                   <Wrench className="h-4 w-4" />
                   Preventive Maintenance
                 </h4>
-                {contract.asset_id && (
+                {hasAssets && (
                   <Button size="sm" onClick={() => setShowLogPm(true)}>
                     Log PM
                   </Button>
@@ -407,7 +388,7 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
               <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{actionError}</div>
             )}
             <div className="flex gap-3 pt-2 border-t border-gray-100 flex-wrap">
-              {contract.asset_id && (
+              {hasAssets && (
                 <Button onClick={() => setShowLogPm(true)}>
                   <Wrench className="mr-2 h-4 w-4" />
                   Log PM
@@ -437,7 +418,7 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
             {showDeleteConfirm && (
               <div className="rounded-lg border border-red-200 bg-red-50 p-4 space-y-3">
                 <p className="text-sm text-red-700">
-                  Are you sure you want to delete the contract for <strong>{contract.vendor_name}</strong>? This will also delete all associated contract items and service reports. This action cannot be undone.
+                  Are you sure you want to delete the contract for <strong>{contract.vendor_name}</strong>? This will also delete all associated service reports. This action cannot be undone.
                 </p>
                 <div className="flex gap-3">
                   <Button variant="danger" loading={deleting} onClick={handleDelete}>
@@ -456,16 +437,21 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
       {showAddReport && (
         <AddServiceReportModal
           serviceContractId={contract.id}
-          assetId={contract.asset_id}
-          assetName={contract.assets?.name}
+          assetId={assetIds[0] ?? null}
+          assetName={getLinkedAssetNames(contract)}
           onClose={() => setShowAddReport(false)}
           onSaved={loadReports}
         />
       )}
 
-      {showLogPm && contract.asset_id && (
+      {showLogPm && hasAssets && (
         <LogContractPmModal
-          contract={contract}
+          contract={{
+            ...contract,
+            asset_id: assetIds[0],
+            asset_ids: assetIds,
+            linked_asset_names: getLinkedAssetNames(contract),
+          }}
           onClose={() => setShowLogPm(false)}
         />
       )}
