@@ -11,6 +11,8 @@ interface Contract {
   id: string
   vendor_name: string
   asset_id: string | null
+  asset_ids?: string[]
+  linked_asset_names?: string
   pm_interval_months: number
   assets: { name: string; asset_tag: string | null } | null
 }
@@ -33,6 +35,9 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
   const [error, setError] = useState('')
 
   const today = new Date().toISOString().split('T')[0]
+
+  const assetIds = contract.asset_ids ?? (contract.asset_id ? [contract.asset_id] : [])
+  const displayName = contract.linked_asset_names ?? contract.assets?.name ?? 'N/A'
 
   const [form, setForm] = useState({
     performed_by: '',
@@ -59,35 +64,37 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
     setLoading(true)
     setError('')
 
-    // Insert maintenance record
-    const recordPayload = {
-      asset_id: contract.asset_id,
-      maintenance_plan_id: null,
-      performed_by: form.performed_by,
-      performed_date: form.performed_date,
-      duration_hours: form.duration_hours ? parseFloat(form.duration_hours) : null,
-      type: 'preventive' as const,
-      description: form.description,
-      findings: form.findings || null,
-      parts_replaced: form.parts_replaced || null,
-      cost: form.cost ? parseFloat(form.cost) : null,
-      status: form.status as any,
-      next_maintenance_date: null,
-      notes: form.notes || null,
-    }
+    // Insert maintenance record for each linked asset
+    for (const assetId of assetIds) {
+      const recordPayload = {
+        asset_id: assetId,
+        maintenance_plan_id: null,
+        performed_by: form.performed_by,
+        performed_date: form.performed_date,
+        duration_hours: form.duration_hours ? parseFloat(form.duration_hours) : null,
+        type: 'preventive' as const,
+        description: form.description,
+        findings: form.findings || null,
+        parts_replaced: form.parts_replaced || null,
+        cost: form.cost ? parseFloat(form.cost) : null,
+        status: form.status as any,
+        next_maintenance_date: null,
+        notes: form.notes || null,
+      }
 
-    const { error: recordError } = await supabase.from('maintenance_records').insert(recordPayload)
-    if (recordError) { setError(recordError.message); setLoading(false); return }
+      const { error: recordError } = await supabase.from('maintenance_records').insert(recordPayload)
+      if (recordError) { setError(recordError.message); setLoading(false); return }
+    }
 
     // Update contract's pm_last_performed_date
     await supabase.from('service_contracts').update({
       pm_last_performed_date: form.performed_date,
     }).eq('id', contract.id)
 
-    // Also add as a service report
+    // Also add as a service report (linked to first asset for backward compat)
     await supabase.from('service_reports').insert({
       service_contract_id: contract.id,
-      asset_id: contract.asset_id,
+      asset_id: assetIds[0] ?? null,
       report_date: form.performed_date,
       technician: form.performed_by,
       type: 'pm_completed',
@@ -114,10 +121,11 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
 
         <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
           <p className="text-sm text-blue-700">
-            <strong>Asset:</strong> {contract.assets?.name ?? 'N/A'} • <strong>Contract:</strong> {contract.vendor_name}
+            <strong>{assetIds.length > 1 ? 'Assets' : 'Asset'}:</strong> {displayName} • <strong>Contract:</strong> {contract.vendor_name}
           </p>
           <p className="text-xs text-blue-600 mt-1">
             PM interval: every {contract.pm_interval_months} month{contract.pm_interval_months !== 1 ? 's' : ''}
+            {assetIds.length > 1 && ` • Will log PM for all ${assetIds.length} linked assets`}
           </p>
         </div>
 
