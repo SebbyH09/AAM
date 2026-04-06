@@ -17,7 +17,7 @@ interface DowntimeEvent {
   impact: string | null
   cost_impact: number | null
   asset_id: string | null
-  assets: { name: string; asset_tag: string | null } | null
+  assets: { name: string; asset_tag: string | null; serial_number: string | null; model: string | null } | null
 }
 
 interface Asset {
@@ -59,6 +59,8 @@ export default function DowntimeClient({ events, assets }: DowntimeClientProps) 
         search === '' ||
         (e.assets?.name?.toLowerCase().includes(search.toLowerCase())) ||
         (e.assets?.asset_tag?.toLowerCase().includes(search.toLowerCase())) ||
+        (e.assets?.serial_number?.toLowerCase().includes(search.toLowerCase())) ||
+        (e.assets?.model?.toLowerCase().includes(search.toLowerCase())) ||
         (e.description?.toLowerCase().includes(search.toLowerCase())) ||
         e.reason.toLowerCase().includes(search.toLowerCase())
       const matchReason = reasonFilter === 'all' || e.reason === reasonFilter

@@ -32,6 +32,7 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
       a.name.toLowerCase().includes(search.toLowerCase()) ||
       (a.asset_tag?.toLowerCase().includes(search.toLowerCase())) ||
       (a.serial_number?.toLowerCase().includes(search.toLowerCase())) ||
+      (a.model?.toLowerCase().includes(search.toLowerCase())) ||
       (a.location?.toLowerCase().includes(search.toLowerCase()))
     const matchCategory = selectedCategory === 'All' || a.category === selectedCategory
     const matchStatus = selectedStatus === 'all' || a.status === selectedStatus
