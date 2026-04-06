@@ -10,7 +10,7 @@ export default async function DowntimePage() {
   const [{ data: events }, { data: assets }] = await Promise.all([
     supabase
       .from('downtime_events')
-      .select('*, assets(name, asset_tag)')
+      .select('*, assets(name, asset_tag, serial_number)')
       .order('start_time', { ascending: false }),
     supabase.from('assets').select('id, name, asset_tag').order('name'),
   ])

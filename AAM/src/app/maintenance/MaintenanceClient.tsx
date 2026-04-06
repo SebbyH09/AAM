@@ -27,7 +27,7 @@ interface Plan {
   estimated_cost: number | null
   parts: { name: string; quantity?: number; part_number?: string }[] | null
   checklist: any | null
-  assets: { id: string; name: string; asset_tag: string | null; location: string | null; category: string; status: string } | null
+  assets: { id: string; name: string; asset_tag: string | null; serial_number: string | null; location: string | null; category: string; status: string } | null
 }
 
 interface MaintenanceClientProps {
@@ -134,6 +134,7 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
       search === '' ||
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       (p.assets?.name?.toLowerCase().includes(search.toLowerCase())) ||
+      (p.assets?.serial_number?.toLowerCase().includes(search.toLowerCase())) ||
       (p.assigned_to?.toLowerCase().includes(search.toLowerCase()))
     const matchPriority = priorityFilter === 'all' || p.priority === priorityFilter
     const matchActive = !showActive || p.is_active

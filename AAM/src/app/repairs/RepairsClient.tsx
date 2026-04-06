@@ -18,7 +18,7 @@ interface Repair {
   total_cost: number | null
   repair_number: string | null
   warranty_repair: boolean
-  assets: { name: string; asset_tag: string | null } | null
+  assets: { name: string; asset_tag: string | null; serial_number: string | null } | null
 }
 
 interface RepairsClientProps {
@@ -38,6 +38,7 @@ export default function RepairsClient({ repairs }: RepairsClientProps) {
       search === '' ||
       r.description.toLowerCase().includes(search.toLowerCase()) ||
       (r.assets?.name?.toLowerCase().includes(search.toLowerCase())) ||
+      (r.assets?.serial_number?.toLowerCase().includes(search.toLowerCase())) ||
       (r.repair_number?.toLowerCase().includes(search.toLowerCase()))
     const matchStatus = statusFilter === 'all' || r.status === statusFilter
     const matchPriority = priorityFilter === 'all' || r.priority === priorityFilter
