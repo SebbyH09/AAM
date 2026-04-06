@@ -47,15 +47,14 @@ export default function DashboardMaintenanceSections() {
     const futureDate = addDays(new Date(), numDays).toISOString().split('T')[0]
 
     const [{ data: due }, { data: contracts }] = await Promise.all([
-      // Maintenance due within X days (including overdue)
+      // Maintenance due within X days AND any overdue (past due)
       supabase
         .from('maintenance_plans')
         .select('*, assets(name, asset_tag)')
         .eq('is_active', true)
-        .gte('next_due_date', today)
         .lte('next_due_date', futureDate)
         .order('next_due_date')
-        .limit(10),
+        .limit(20),
       // Upcoming preventative maintenance from service contracts
       supabase
         .from('service_contracts')
@@ -158,7 +157,7 @@ export default function DashboardMaintenanceSections() {
             <h2 className="font-semibold text-gray-900">
               Maintenance Due
               <span className="ml-1 text-sm font-normal text-gray-500">
-                (next {days} {days === 1 ? 'day' : 'days'})
+                (overdue + next {days} {days === 1 ? 'day' : 'days'})
               </span>
             </h2>
           </div>
@@ -188,7 +187,7 @@ export default function DashboardMaintenanceSections() {
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <CheckCircle className="h-8 w-8 text-green-400 mb-2" />
-              <p className="text-sm text-gray-500">No maintenance due in the next {days} days</p>
+              <p className="text-sm text-gray-500">No overdue or upcoming maintenance in the next {days} days</p>
             </div>
           )}
         </div>
