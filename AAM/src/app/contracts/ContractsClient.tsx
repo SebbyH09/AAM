@@ -30,7 +30,7 @@ interface Contract {
   coverage_details: string | null
   notes: string | null
   asset_id: string | null
-  assets: { name: string; asset_tag: string | null; serial_number: string | null } | null
+  assets: { name: string; asset_tag: string | null; serial_number: string | null; model: string | null } | null
 }
 
 function getPmStatus(contract: Contract): { label: string; nextDate: string; color: string } | null {
@@ -66,7 +66,8 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
       c.vendor_name.toLowerCase().includes(search.toLowerCase()) ||
       (c.contract_number?.toLowerCase().includes(search.toLowerCase())) ||
       (c.assets?.name?.toLowerCase().includes(search.toLowerCase())) ||
-      (c.assets?.serial_number?.toLowerCase().includes(search.toLowerCase()))
+      (c.assets?.serial_number?.toLowerCase().includes(search.toLowerCase())) ||
+      (c.assets?.model?.toLowerCase().includes(search.toLowerCase()))
     const matchStatus = statusFilter === 'all' || c.status === statusFilter
     return matchSearch && matchStatus
   })

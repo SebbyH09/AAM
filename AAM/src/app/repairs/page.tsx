@@ -11,7 +11,7 @@ export default async function RepairsPage() {
 
   const { data: repairs } = await supabase
     .from('repairs')
-    .select('*, assets(name, asset_tag, serial_number)')
+    .select('*, assets(name, asset_tag, serial_number, model)')
     .order('reported_date', { ascending: false })
 
   return (
