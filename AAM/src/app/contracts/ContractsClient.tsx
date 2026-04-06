@@ -116,7 +116,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Vendor / Asset</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Asset / Vendor</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Period</th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Expiry</th>
@@ -135,11 +135,11 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{contract.vendor_name}</p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-sm font-medium text-gray-900">
                             {contract.assets?.name ?? 'No asset linked'}
-                            {contract.contract_number && ` • #${contract.contract_number}`}
+                            {contract.contract_number && <span className="text-gray-400 font-normal"> • #{contract.contract_number}</span>}
                           </p>
+                          <p className="text-xs text-gray-500">{contract.vendor_name}</p>
                         </div>
                         {contract.file_name && (
                           <button
