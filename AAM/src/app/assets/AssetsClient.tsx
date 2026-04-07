@@ -33,7 +33,8 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
       (a.asset_tag?.toLowerCase().includes(search.toLowerCase())) ||
       (a.serial_number?.toLowerCase().includes(search.toLowerCase())) ||
       (a.model?.toLowerCase().includes(search.toLowerCase())) ||
-      (a.location?.toLowerCase().includes(search.toLowerCase()))
+      (a.location?.toLowerCase().includes(search.toLowerCase())) ||
+      (a.manufacturer?.toLowerCase().includes(search.toLowerCase()))
     const matchCategory = selectedCategory === 'All' || a.category === selectedCategory
     const matchStatus = selectedStatus === 'all' || a.status === selectedStatus
     return matchSearch && matchCategory && matchStatus
@@ -83,7 +84,7 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search assets..."
+            placeholder="Search by name, tag, serial, model, location, manufacturer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
