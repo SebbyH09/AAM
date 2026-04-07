@@ -29,7 +29,7 @@ export default async function AssetDetailPage({ params }: PageProps) {
     supabase.from('assets').select('*').eq('id', id).single(),
     supabase.from('service_contracts').select('*').eq('asset_id', id).order('end_date'),
     supabase.from('maintenance_plans').select('*').eq('asset_id', id).order('next_due_date'),
-    supabase.from('maintenance_records').select('*').eq('asset_id', id).order('performed_date', { ascending: false }).limit(10),
+    supabase.from('maintenance_records').select('*').eq('asset_id', id).order('performed_date', { ascending: false }),
     supabase.from('repairs').select('*').eq('asset_id', id).order('reported_date', { ascending: false }),
     supabase.from('downtime_events').select('*').eq('asset_id', id).order('start_time', { ascending: false }).limit(10),
   ])
@@ -211,10 +211,18 @@ export default async function AssetDetailPage({ params }: PageProps) {
                 <Clock className="h-5 w-5 text-purple-600" />
                 <h2 className="font-semibold text-gray-900">Maintenance History</h2>
               </div>
+              {records && records.length > 0 && (
+                <Link
+                  href={`/assets/${id}/maintenance-history`}
+                  className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                >
+                  View All ({records.length})
+                </Link>
+              )}
             </div>
             <div className="divide-y divide-gray-100">
               {records && records.length > 0 ? (
-                records.map((r) => (
+                records.slice(0, 5).map((r) => (
                   <div key={r.id} className="px-6 py-3">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-gray-900">{r.type}</p>
