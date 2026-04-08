@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge } from '@/lib/utils'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Edit, Plus, FileText, Wrench, ClipboardList, Clock } from 'lucide-react'
+import { Edit, Plus, FileText, Wrench, ClipboardList, Clock, Zap, Ruler, Wifi, Droplets, Wind, Thermometer } from 'lucide-react'
 import DeleteAssetButton from './DeleteAssetButton'
 import DeactivateAssetButton from './DeactivateAssetButton'
 
@@ -83,6 +83,97 @@ export default async function AssetDetailPage({ params }: PageProps) {
             <p className="mt-1 text-sm font-semibold text-gray-900">{formatCurrency(totalRepairCost)}</p>
           </div>
         </div>
+
+        {/* Facilities Information */}
+        {(asset.power_requirements || asset.dimensions || asset.weight || asset.internet_requirements || asset.water_requirements || asset.air_gas_requirements || asset.ventilation_requirements || asset.environmental_requirements || asset.facilities_notes) && (
+          <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h2 className="font-semibold text-gray-900">Facilities Information</h2>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {asset.power_requirements && (
+                  <div className="flex items-start gap-3">
+                    <Zap className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Power</p>
+                      <p className="text-sm text-gray-900 mt-0.5">{asset.power_requirements}</p>
+                    </div>
+                  </div>
+                )}
+                {asset.dimensions && (
+                  <div className="flex items-start gap-3">
+                    <Ruler className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Dimensions</p>
+                      <p className="text-sm text-gray-900 mt-0.5">{asset.dimensions}</p>
+                    </div>
+                  </div>
+                )}
+                {asset.weight && (
+                  <div className="flex items-start gap-3">
+                    <Ruler className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Weight</p>
+                      <p className="text-sm text-gray-900 mt-0.5">{asset.weight}</p>
+                    </div>
+                  </div>
+                )}
+                {asset.internet_requirements && (
+                  <div className="flex items-start gap-3">
+                    <Wifi className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Internet / Network</p>
+                      <p className="text-sm text-gray-900 mt-0.5">{asset.internet_requirements}</p>
+                    </div>
+                  </div>
+                )}
+                {asset.water_requirements && (
+                  <div className="flex items-start gap-3">
+                    <Droplets className="mt-0.5 h-4 w-4 shrink-0 text-cyan-500" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Water / Drain</p>
+                      <p className="text-sm text-gray-900 mt-0.5">{asset.water_requirements}</p>
+                    </div>
+                  </div>
+                )}
+                {asset.air_gas_requirements && (
+                  <div className="flex items-start gap-3">
+                    <Wind className="mt-0.5 h-4 w-4 shrink-0 text-teal-500" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Air / Gases</p>
+                      <p className="text-sm text-gray-900 mt-0.5">{asset.air_gas_requirements}</p>
+                    </div>
+                  </div>
+                )}
+                {asset.ventilation_requirements && (
+                  <div className="flex items-start gap-3">
+                    <Wind className="mt-0.5 h-4 w-4 shrink-0 text-teal-500" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Ventilation</p>
+                      <p className="text-sm text-gray-900 mt-0.5">{asset.ventilation_requirements}</p>
+                    </div>
+                  </div>
+                )}
+                {asset.environmental_requirements && (
+                  <div className="flex items-start gap-3">
+                    <Thermometer className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Environmental</p>
+                      <p className="text-sm text-gray-900 mt-0.5">{asset.environmental_requirements}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {asset.facilities_notes && (
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Facilities Notes</p>
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{asset.facilities_notes}</p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Details Grid */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

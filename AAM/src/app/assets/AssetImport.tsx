@@ -11,7 +11,7 @@ const VALID_CATEGORIES = ['Analytical', 'Lab Equipment', 'HVAC', 'IT/Network', '
 const VALID_STATUSES = ['active', 'inactive', 'repair', 'decommissioned']
 
 const REQUIRED_COLUMNS = ['name', 'category']
-const OPTIONAL_COLUMNS = ['asset_tag', 'manufacturer', 'model', 'serial_number', 'location', 'status', 'purchase_date', 'purchase_cost', 'date_installed', 'notes']
+const OPTIONAL_COLUMNS = ['asset_tag', 'manufacturer', 'model', 'serial_number', 'location', 'status', 'purchase_date', 'purchase_cost', 'date_installed', 'notes', 'power_requirements', 'dimensions', 'weight', 'internet_requirements', 'water_requirements', 'air_gas_requirements', 'ventilation_requirements', 'environmental_requirements', 'facilities_notes']
 
 interface ParsedRow {
   name: string
@@ -26,6 +26,15 @@ interface ParsedRow {
   purchase_cost?: number
   date_installed?: string
   notes?: string
+  power_requirements?: string
+  dimensions?: string
+  weight?: string
+  internet_requirements?: string
+  water_requirements?: string
+  air_gas_requirements?: string
+  ventilation_requirements?: string
+  environmental_requirements?: string
+  facilities_notes?: string
 }
 
 interface RowResult {
@@ -148,6 +157,15 @@ export default function AssetImport({ onSuccess }: AssetImportProps) {
             purchase_cost: normalizedRow.purchase_cost ? Number(normalizedRow.purchase_cost) : undefined,
             date_installed: normalizedRow.date_installed ? String(normalizedRow.date_installed).trim() : undefined,
             notes: normalizedRow.notes ? String(normalizedRow.notes).trim() : undefined,
+            power_requirements: normalizedRow.power_requirements ? String(normalizedRow.power_requirements).trim() : undefined,
+            dimensions: normalizedRow.dimensions ? String(normalizedRow.dimensions).trim() : undefined,
+            weight: normalizedRow.weight ? String(normalizedRow.weight).trim() : undefined,
+            internet_requirements: normalizedRow.internet_requirements ? String(normalizedRow.internet_requirements).trim() : undefined,
+            water_requirements: normalizedRow.water_requirements ? String(normalizedRow.water_requirements).trim() : undefined,
+            air_gas_requirements: normalizedRow.air_gas_requirements ? String(normalizedRow.air_gas_requirements).trim() : undefined,
+            ventilation_requirements: normalizedRow.ventilation_requirements ? String(normalizedRow.ventilation_requirements).trim() : undefined,
+            environmental_requirements: normalizedRow.environmental_requirements ? String(normalizedRow.environmental_requirements).trim() : undefined,
+            facilities_notes: normalizedRow.facilities_notes ? String(normalizedRow.facilities_notes).trim() : undefined,
           }
         })
 
@@ -217,6 +235,15 @@ export default function AssetImport({ onSuccess }: AssetImportProps) {
         purchase_cost: row.purchase_cost ?? null,
         date_installed: row.date_installed || null,
         notes: row.notes || null,
+        power_requirements: row.power_requirements || null,
+        dimensions: row.dimensions || null,
+        weight: row.weight || null,
+        internet_requirements: row.internet_requirements || null,
+        water_requirements: row.water_requirements || null,
+        air_gas_requirements: row.air_gas_requirements || null,
+        ventilation_requirements: row.ventilation_requirements || null,
+        environmental_requirements: row.environmental_requirements || null,
+        facilities_notes: row.facilities_notes || null,
       }
 
       const { error: insertError } = await supabase.from('assets').insert(payload)

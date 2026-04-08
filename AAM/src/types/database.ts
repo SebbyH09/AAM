@@ -82,6 +82,15 @@ export interface Asset {
   purchase_cost: number | null
   date_installed: string | null
   notes: string | null
+  power_requirements: string | null
+  dimensions: string | null
+  weight: string | null
+  internet_requirements: string | null
+  water_requirements: string | null
+  air_gas_requirements: string | null
+  ventilation_requirements: string | null
+  environmental_requirements: string | null
+  facilities_notes: string | null
   created_at: string
   updated_at: string
 }
