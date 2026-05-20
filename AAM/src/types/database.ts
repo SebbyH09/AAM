@@ -115,6 +115,7 @@ export interface ServiceContract {
   pm_last_performed_date: string | null
   pm_interval_months: number
   notes: string | null
+  renewed_from_contract_id: string | null
   created_at: string
   updated_at: string
 }

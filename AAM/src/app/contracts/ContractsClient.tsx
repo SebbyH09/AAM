@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge } from '@/lib/utils'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Search, FileText, ChevronRight, Paperclip, Wrench } from 'lucide-react'
+import { Search, FileText, ChevronRight, Paperclip, Wrench, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { addMonths, parseISO, differenceInDays, format } from 'date-fns'
 import ContractDetailModal from './ContractDetailModal'
@@ -37,6 +37,7 @@ interface Contract {
   asset_id: string | null
   assets: { name: string; asset_tag: string | null; serial_number: string | null; model: string | null } | null
   service_contract_assets?: LinkedAsset[]
+  renewed_from_contract_id?: string | null
 }
 
 function getLinkedAssetNames(contract: Contract): string {
@@ -214,7 +215,15 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <Badge className={statusColor(contract.status)}>{contract.status}</Badge>
+                      <div className="flex flex-col gap-1">
+                        <Badge className={statusColor(contract.status)}>{contract.status}</Badge>
+                        {contract.renewed_from_contract_id && (
+                          <Badge className="bg-purple-100 text-purple-700 text-[10px] flex items-center gap-0.5 w-fit">
+                            <RefreshCw className="h-2.5 w-2.5" />
+                            Renewal
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <Link
