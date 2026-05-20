@@ -6,12 +6,13 @@ import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { formatDate, formatCurrency, statusColor } from '@/lib/utils'
-import { X, FileText, Wrench, Plus, ClipboardList, Trash2, XCircle } from 'lucide-react'
+import { X, FileText, Wrench, Plus, ClipboardList, Trash2, XCircle, RefreshCw } from 'lucide-react'
 import { addMonths, parseISO, differenceInDays, format } from 'date-fns'
 import Link from 'next/link'
 import AddServiceReportModal from './AddServiceReportModal'
 import LogContractPmModal from './LogContractPmModal'
 import ServiceReportDetailModal from './ServiceReportDetailModal'
+import RenewContractModal from './RenewContractModal'
 
 interface LinkedAsset {
   asset_id: string
@@ -40,6 +41,7 @@ interface Contract {
   asset_id: string | null
   assets: { name: string; asset_tag: string | null } | null
   service_contract_assets?: LinkedAsset[]
+  renewed_from_contract_id?: string | null
 }
 
 interface ServiceReport {
@@ -108,6 +110,7 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deactivating, setDeactivating] = useState(false)
+  const [showRenewModal, setShowRenewModal] = useState(false)
   const [actionError, setActionError] = useState('')
 
   const pm = getPmInfo(contract)
@@ -203,6 +206,12 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
             <div className="flex items-center gap-2 flex-wrap">
               <Badge className={statusColor(contract.status)}>{contract.status}</Badge>
               <Badge className="bg-gray-100 text-gray-700 capitalize">{contract.contract_type.replace(/_/g, ' ')}</Badge>
+              {contract.renewed_from_contract_id && (
+                <Badge className="bg-purple-100 text-purple-700 flex items-center gap-1">
+                  <RefreshCw className="h-3 w-3" />
+                  Renewal
+                </Badge>
+              )}
               {contract.file_name && (
                 <button onClick={openFile} className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800">
                   <FileText className="h-3 w-3" />
@@ -398,6 +407,10 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
                 <Plus className="mr-2 h-4 w-4" />
                 Add Service Report
               </Button>
+              <Button variant="secondary" onClick={() => setShowRenewModal(true)}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Renew Contract
+              </Button>
               <Link
                 href={`/contracts/${contract.id}/edit`}
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
@@ -460,6 +473,18 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
         <ServiceReportDetailModal
           report={selectedReport}
           onClose={() => setSelectedReport(null)}
+        />
+      )}
+
+      {showRenewModal && (
+        <RenewContractModal
+          contract={contract}
+          onClose={() => setShowRenewModal(false)}
+          onRenewed={() => {
+            setShowRenewModal(false)
+            onClose()
+            if (onDeleted) onDeleted()
+          }}
         />
       )}
     </>
