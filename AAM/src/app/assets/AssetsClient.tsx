@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/Badge'
-import { formatDate, formatCurrency, statusColor } from '@/lib/utils'
+import { formatDate, statusColor } from '@/lib/utils'
 import { Asset } from '@/types/database'
 import Link from 'next/link'
-import { Search, Package, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { Search, Package, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Download, ChevronDown } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 const CATEGORIES = ['All', 'Analytical', 'Lab Equipment', 'HVAC', 'IT/Network', 'Electrical', 'Mechanical', 'Other']
 const STATUSES = ['all', 'active', 'inactive', 'repair', 'decommissioned']
@@ -18,6 +19,48 @@ interface AssetsClientProps {
 type SortField = 'name' | 'category' | 'location' | 'status' | 'purchase_date' | 'date_installed'
 type SortDir = 'asc' | 'desc'
 
+function exportAssets(assets: Asset[], format: 'xlsx' | 'csv') {
+  const rows = assets.map((a) => ({
+    'Name': a.name,
+    'Asset Tag': a.asset_tag ?? '',
+    'Category': a.category,
+    'Manufacturer': a.manufacturer ?? '',
+    'Model': a.model ?? '',
+    'Serial Number': a.serial_number ?? '',
+    'Location': a.location ?? '',
+    'Status': a.status,
+    'Purchase Date': a.purchase_date ?? '',
+    'Date Installed': a.date_installed ?? '',
+    'Purchase Cost': a.purchase_cost ?? '',
+    'Notes': a.notes ?? '',
+    'Power Requirements': a.power_requirements ?? '',
+    'Dimensions': a.dimensions ?? '',
+    'Weight': a.weight ?? '',
+    'Internet Requirements': a.internet_requirements ?? '',
+    'Water Requirements': a.water_requirements ?? '',
+    'Air/Gas Requirements': a.air_gas_requirements ?? '',
+    'Ventilation Requirements': a.ventilation_requirements ?? '',
+    'Environmental Requirements': a.environmental_requirements ?? '',
+    'Facilities Notes': a.facilities_notes ?? '',
+  }))
+
+  const ws = XLSX.utils.json_to_sheet(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Assets')
+  ws['!cols'] = [
+    { wch: 24 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 20 },
+    { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 14 },
+    { wch: 14 }, { wch: 30 }, { wch: 20 }, { wch: 14 }, { wch: 12 },
+    { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 22 }, { wch: 24 }, { wch: 24 },
+  ]
+  const timestamp = new Date().toISOString().slice(0, 10)
+  if (format === 'csv') {
+    XLSX.writeFile(wb, `assets_${timestamp}.csv`, { bookType: 'csv' })
+  } else {
+    XLSX.writeFile(wb, `assets_${timestamp}.xlsx`)
+  }
+}
+
 export default function AssetsClient({ assets }: AssetsClientProps) {
   const router = useRouter()
   const [search, setSearch] = useState('')
@@ -25,6 +68,18 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [exportOpen, setExportOpen] = useState(false)
+  const exportRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const filtered = assets.filter((a) => {
     const matchSearch =
@@ -90,7 +145,7 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
             className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           {STATUSES.map((s) => (
             <button
               key={s}
@@ -104,6 +159,35 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
               {s}
             </button>
           ))}
+
+          {/* Export dropdown */}
+          <div ref={exportRef} className="relative">
+            <button
+              onClick={() => setExportOpen((v) => !v)}
+              disabled={sorted.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export
+              <ChevronDown className="h-3 w-3" />
+            </button>
+            {exportOpen && (
+              <div className="absolute right-0 top-full mt-1 z-10 w-44 rounded-lg border border-gray-200 bg-white shadow-lg">
+                <button
+                  onClick={() => { exportAssets(sorted, 'xlsx'); setExportOpen(false) }}
+                  className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-t-lg"
+                >
+                  Export as Excel
+                </button>
+                <button
+                  onClick={() => { exportAssets(sorted, 'csv'); setExportOpen(false) }}
+                  className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-b-lg border-t border-gray-100"
+                >
+                  Export as CSV
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
