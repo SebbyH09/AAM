@@ -8,11 +8,18 @@ import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Upload, X, FileText } from 'lucide-react'
 
+interface LinkedAssetOption {
+  asset_id: string
+  name: string
+  asset_tag?: string | null
+}
+
 interface AddServiceReportModalProps {
   serviceContractId?: string | null
   maintenancePlanId?: string | null
   assetId?: string | null
   assetName?: string
+  linkedAssets?: LinkedAssetOption[]
   onClose: () => void
   onSaved?: () => void
 }
@@ -41,11 +48,26 @@ const ACCEPTED_TYPES = [
 ]
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
+const INITIAL_FORM = {
+  report_date: new Date().toISOString().split('T')[0],
+  technician: '',
+  type: 'service_visit',
+  summary: '',
+  findings: '',
+  recommendations: '',
+  parts_used: '',
+  labor_hours: '',
+  cost: '',
+  status: 'completed',
+  notes: '',
+}
+
 export default function AddServiceReportModal({
   serviceContractId,
   maintenancePlanId,
   assetId,
   assetName,
+  linkedAssets,
   onClose,
   onSaved,
 }: AddServiceReportModalProps) {
@@ -55,23 +77,16 @@ export default function AddServiceReportModal({
   const [error, setError] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [addAnother, setAddAnother] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const today = new Date().toISOString().split('T')[0]
+  // When multiple assets are linked, let the user pick which one this report is for
+  const hasMultipleAssets = linkedAssets && linkedAssets.length > 1
+  const [selectedAssetId, setSelectedAssetId] = useState<string>(
+    assetId ?? linkedAssets?.[0]?.asset_id ?? ''
+  )
 
-  const [form, setForm] = useState({
-    report_date: today,
-    technician: '',
-    type: 'service_visit',
-    summary: '',
-    findings: '',
-    recommendations: '',
-    parts_used: '',
-    labor_hours: '',
-    cost: '',
-    status: 'completed',
-    notes: '',
-  })
+  const [form, setForm] = useState({ ...INITIAL_FORM })
 
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }))
@@ -89,30 +104,21 @@ export default function AddServiceReportModal({
 
   function handleFileSelect(f: File) {
     const err = validateFile(f)
-    if (err) {
-      setError(err)
-      return
-    }
+    if (err) { setError(err); return }
     setError('')
     setFile(f)
   }
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOver(true)
+    e.preventDefault(); e.stopPropagation(); setDragOver(true)
   }, [])
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOver(false)
+    e.preventDefault(); e.stopPropagation(); setDragOver(false)
   }, [])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOver(false)
+    e.preventDefault(); e.stopPropagation(); setDragOver(false)
     const droppedFile = e.dataTransfer.files[0]
     if (droppedFile) handleFileSelect(droppedFile)
   }, [])
@@ -121,10 +127,8 @@ export default function AddServiceReportModal({
     if (!file) return null
     const ext = file.name.split('.').pop()
     const path = `${reportId}/${Date.now()}.${ext}`
-
     const { error } = await supabase.storage.from('service-reports').upload(path, file)
     if (error) throw new Error(`Upload failed: ${error.message}`)
-
     const { data: urlData } = supabase.storage.from('service-reports').getPublicUrl(path)
     return { path, name: file.name, url: urlData.publicUrl }
   }
@@ -138,10 +142,12 @@ export default function AddServiceReportModal({
     setLoading(true)
     setError('')
 
+    const resolvedAssetId = selectedAssetId || assetId || null
+
     const payload: Record<string, unknown> = {
       service_contract_id: serviceContractId ?? null,
       maintenance_plan_id: maintenancePlanId ?? null,
-      asset_id: assetId ?? null,
+      asset_id: resolvedAssetId,
       report_date: form.report_date,
       technician: form.technician,
       type: form.type,
@@ -173,17 +179,35 @@ export default function AddServiceReportModal({
           }).eq('id', data.id)
         }
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'File upload failed'
-        setError(message)
+        setError(err instanceof Error ? err.message : 'File upload failed')
         setLoading(false)
         return
       }
     }
 
-    router.refresh()
     onSaved?.()
-    onClose()
+
+    if (addAnother) {
+      // Reset form but keep modal open
+      setForm({ ...INITIAL_FORM })
+      setFile(null)
+      setAddAnother(false)
+      setLoading(false)
+    } else {
+      router.refresh()
+      onClose()
+    }
   }
+
+  const assetOptions = linkedAssets
+    ? [
+        { value: '', label: 'Contract-level (no specific unit)' },
+        ...linkedAssets.map((a) => ({
+          value: a.asset_id,
+          label: a.name + (a.asset_tag ? ` (${a.asset_tag})` : ''),
+        })),
+      ]
+    : []
 
   return (
     <Modal open={true} onClose={onClose} title="Add Service Report" size="lg">
@@ -192,13 +216,26 @@ export default function AddServiceReportModal({
           <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>
         )}
 
-        {assetName && (
+        {/* Asset context banner */}
+        {assetName && !hasMultipleAssets && (
           <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
             <p className="text-sm text-blue-700"><strong>Asset:</strong> {assetName}</p>
           </div>
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Asset picker — shown when the contract covers multiple units */}
+          {hasMultipleAssets && (
+            <div className="sm:col-span-2">
+              <Select
+                label="Unit"
+                value={selectedAssetId}
+                onChange={(e) => setSelectedAssetId(e.target.value)}
+                options={assetOptions}
+              />
+            </div>
+          )}
+
           <Input label="Technician *" value={form.technician} onChange={set('technician')} placeholder="Technician name" />
           <Input label="Report Date *" type="date" value={form.report_date} onChange={set('report_date')} />
           <Select label="Type" value={form.type} onChange={set('type')} options={TYPE_OPTIONS} />
@@ -272,8 +309,18 @@ export default function AddServiceReportModal({
           </div>
         </div>
 
-        <div className="flex gap-3 pt-2">
-          <Button type="submit" loading={loading}>Save Report</Button>
+        <div className="flex gap-3 pt-2 flex-wrap">
+          <Button type="submit" loading={loading} onClick={() => setAddAnother(false)}>
+            Save Report
+          </Button>
+          <Button
+            type="submit"
+            variant="secondary"
+            loading={loading}
+            onClick={() => setAddAnother(true)}
+          >
+            Save & Add Another
+          </Button>
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
         </div>
       </form>

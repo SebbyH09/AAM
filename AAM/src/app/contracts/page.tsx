@@ -11,7 +11,7 @@ export default async function ContractsPage() {
 
   const { data: contracts } = await supabase
     .from('service_contracts')
-    .select('*, assets(name, asset_tag, serial_number, model), service_contract_assets(asset_id, assets(id, name, asset_tag, serial_number, model))')
+    .select('*, assets(name, asset_tag, serial_number, model), service_contract_assets(asset_id, pm_last_performed_date, assets(id, name, asset_tag, serial_number, model))')
     .order('end_date')
 
   return (

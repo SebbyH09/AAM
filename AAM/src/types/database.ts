@@ -124,6 +124,7 @@ export interface ServiceContractAsset {
   id: string
   service_contract_id: string
   asset_id: string
+  pm_last_performed_date: string | null
   created_at: string
 }
 
