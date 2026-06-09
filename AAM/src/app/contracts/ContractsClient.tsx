@@ -12,6 +12,7 @@ import ContractDetailModal from './ContractDetailModal'
 
 interface LinkedAsset {
   asset_id: string
+  pm_last_performed_date: string | null
   assets: { id: string; name: string; asset_tag: string | null; serial_number: string | null; model: string | null } | null
 }
 

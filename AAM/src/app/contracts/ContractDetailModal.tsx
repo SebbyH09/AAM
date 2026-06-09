@@ -16,6 +16,7 @@ import RenewContractModal from './RenewContractModal'
 
 interface LinkedAsset {
   asset_id: string
+  pm_last_performed_date: string | null
   assets: { id: string; name: string; asset_tag: string | null; serial_number: string | null; model: string | null } | null
 }
 
@@ -309,6 +310,27 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
                 <p className="text-sm text-gray-500">No PM tracking configured. Set a PM date on this contract to enable tracking.</p>
               )}
               <p className="text-xs text-gray-400 mt-2">Interval: every {contract.pm_interval_months} month{contract.pm_interval_months !== 1 ? 's' : ''}</p>
+              {/* Per-asset PM dates */}
+              {linkedAssets.length > 1 && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <p className="text-xs font-medium text-gray-500 mb-2">Last PM per unit</p>
+                  <div className="space-y-1">
+                    {linkedAssets.filter((la) => la.assets).map((la) => (
+                      <div key={la.asset_id} className="flex items-center justify-between text-xs">
+                        <span className="text-gray-700">
+                          {la.assets!.name}
+                          {la.assets!.asset_tag && <span className="text-gray-400 ml-1">({la.assets!.asset_tag})</span>}
+                        </span>
+                        {la.pm_last_performed_date ? (
+                          <span className="text-gray-600">{formatDate(la.pm_last_performed_date)}</span>
+                        ) : (
+                          <span className="text-gray-400 italic">No PM logged</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Service Reports Section */}
@@ -451,7 +473,16 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
         <AddServiceReportModal
           serviceContractId={contract.id}
           assetId={assetIds[0] ?? null}
-          assetName={getLinkedAssetNames(contract)}
+          assetName={linkedAssets.length <= 1 ? getLinkedAssetNames(contract) : undefined}
+          linkedAssets={
+            linkedAssets.length > 1
+              ? linkedAssets.filter((la) => la.assets).map((la) => ({
+                  asset_id: la.asset_id,
+                  name: la.assets!.name,
+                  asset_tag: la.assets!.asset_tag,
+                }))
+              : undefined
+          }
           onClose={() => setShowAddReport(false)}
           onSaved={loadReports}
         />
@@ -464,6 +495,12 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
             asset_id: assetIds[0],
             asset_ids: assetIds,
             linked_asset_names: getLinkedAssetNames(contract),
+            linked_assets: linkedAssets.filter((la) => la.assets).map((la) => ({
+              asset_id: la.asset_id,
+              pm_last_performed_date: la.pm_last_performed_date,
+              name: la.assets!.name,
+              asset_tag: la.assets!.asset_tag,
+            })),
           }}
           onClose={() => setShowLogPm(false)}
         />

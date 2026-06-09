@@ -7,12 +7,20 @@ import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 
+interface LinkedAssetInfo {
+  asset_id: string
+  pm_last_performed_date: string | null
+  name: string
+  asset_tag: string | null
+}
+
 interface Contract {
   id: string
   vendor_name: string
   asset_id: string | null
   asset_ids?: string[]
   linked_asset_names?: string
+  linked_assets?: LinkedAssetInfo[]
   pm_interval_months: number
   assets: { name: string; asset_tag: string | null } | null
 }
@@ -36,8 +44,11 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
 
   const today = new Date().toISOString().split('T')[0]
 
-  const assetIds = contract.asset_ids ?? (contract.asset_id ? [contract.asset_id] : [])
-  const displayName = contract.linked_asset_names ?? contract.assets?.name ?? 'N/A'
+  const allAssetIds = contract.asset_ids ?? (contract.asset_id ? [contract.asset_id] : [])
+  const linkedAssets = contract.linked_assets ?? []
+  const hasMultipleAssets = linkedAssets.length > 1
+
+  const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set(allAssetIds))
 
   const [form, setForm] = useState({
     performed_by: '',
@@ -55,18 +66,40 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
     setForm((prev) => ({ ...prev, [field]: e.target.value }))
   }
 
+  function toggleAsset(assetId: string) {
+    setSelectedAssetIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(assetId)) {
+        next.delete(assetId)
+      } else {
+        next.add(assetId)
+      }
+      return next
+    })
+  }
+
+  function toggleAll(checked: boolean) {
+    setSelectedAssetIds(checked ? new Set(allAssetIds) : new Set())
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.performed_by || !form.description) {
       setError('Performed by and description are required.')
       return
     }
+    if (selectedAssetIds.size === 0) {
+      setError('Select at least one asset.')
+      return
+    }
     setLoading(true)
     setError('')
 
-    // Insert maintenance record for each linked asset
-    for (const assetId of assetIds) {
-      const recordPayload = {
+    const targetAssetIds = Array.from(selectedAssetIds)
+
+    // Insert a maintenance record for each selected asset
+    for (const assetId of targetAssetIds) {
+      const { error: recordError } = await supabase.from('maintenance_records').insert({
         asset_id: assetId,
         maintenance_plan_id: null,
         performed_by: form.performed_by,
@@ -77,24 +110,31 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
         findings: form.findings || null,
         parts_replaced: form.parts_replaced || null,
         cost: form.cost ? parseFloat(form.cost) : null,
-        status: form.status as any,
+        status: form.status as 'completed' | 'incomplete' | 'requires_followup',
         next_maintenance_date: null,
         notes: form.notes || null,
-      }
-
-      const { error: recordError } = await supabase.from('maintenance_records').insert(recordPayload)
+      })
       if (recordError) { setError(recordError.message); setLoading(false); return }
+
+      // Update per-asset PM date in the junction table
+      const { error: junctionError } = await supabase
+        .from('service_contract_assets')
+        .update({ pm_last_performed_date: form.performed_date })
+        .eq('service_contract_id', contract.id)
+        .eq('asset_id', assetId)
+      if (junctionError) { setError(junctionError.message); setLoading(false); return }
     }
 
-    // Update contract's pm_last_performed_date
-    await supabase.from('service_contracts').update({
-      pm_last_performed_date: form.performed_date,
-    }).eq('id', contract.id)
+    // Update contract-level pm_last_performed_date
+    await supabase
+      .from('service_contracts')
+      .update({ pm_last_performed_date: form.performed_date })
+      .eq('id', contract.id)
 
-    // Also add as a service report (linked to first asset for backward compat)
+    // Create a service report linked to the contract
     await supabase.from('service_reports').insert({
       service_contract_id: contract.id,
-      asset_id: assetIds[0] ?? null,
+      asset_id: targetAssetIds[0] ?? null,
       report_date: form.performed_date,
       technician: form.performed_by,
       type: 'pm_completed',
@@ -112,6 +152,9 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
     onClose()
   }
 
+  const allSelected = selectedAssetIds.size === allAssetIds.length
+  const someSelected = selectedAssetIds.size > 0 && !allSelected
+
   return (
     <Modal open={true} onClose={onClose} title="Log Preventive Maintenance" size="lg">
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -121,13 +164,54 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
 
         <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
           <p className="text-sm text-blue-700">
-            <strong>{assetIds.length > 1 ? 'Assets' : 'Asset'}:</strong> {displayName} • <strong>Contract:</strong> {contract.vendor_name}
+            <strong>Contract:</strong> {contract.vendor_name}
           </p>
           <p className="text-xs text-blue-600 mt-1">
             PM interval: every {contract.pm_interval_months} month{contract.pm_interval_months !== 1 ? 's' : ''}
-            {assetIds.length > 1 && ` • Will log PM for all ${assetIds.length} linked assets`}
           </p>
         </div>
+
+        {/* Asset selection — only shown when contract covers multiple assets */}
+        {hasMultipleAssets && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-gray-700">Units being serviced</label>
+              <button
+                type="button"
+                onClick={() => toggleAll(!allSelected)}
+                className="text-xs text-blue-600 hover:text-blue-800"
+              >
+                {allSelected ? 'Deselect all' : 'Select all'}
+              </button>
+            </div>
+            <div className="rounded-lg border border-gray-200 divide-y divide-gray-100">
+              {linkedAssets.map((asset) => (
+                <label key={asset.asset_id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={selectedAssetIds.has(asset.asset_id)}
+                    onChange={() => toggleAsset(asset.asset_id)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm text-gray-800">{asset.name}</span>
+                    {asset.asset_tag && <span className="text-xs text-gray-400 ml-1">({asset.asset_tag})</span>}
+                  </div>
+                  {asset.pm_last_performed_date && (
+                    <span className="text-xs text-gray-400 shrink-0">
+                      Last: {new Date(asset.pm_last_performed_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  )}
+                </label>
+              ))}
+            </div>
+            {someSelected && (
+              <p className="text-xs text-amber-600 mt-1">
+                Logging PM for {selectedAssetIds.size} of {allAssetIds.length} units
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="Performed By *" value={form.performed_by} onChange={set('performed_by')} placeholder="Technician name" />
