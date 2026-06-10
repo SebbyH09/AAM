@@ -7,6 +7,7 @@ import { notFound } from 'next/navigation'
 import { Edit, Plus, FileText, Wrench, ClipboardList, Clock, Zap, Ruler, Wifi, Droplets, Wind, Thermometer } from 'lucide-react'
 import DeleteAssetButton from './DeleteAssetButton'
 import DeactivateAssetButton from './DeactivateAssetButton'
+import AssetDocumentsSection from './AssetDocumentsSection'
 
 export const dynamic = 'force-dynamic'
 
@@ -340,6 +341,9 @@ export default async function AssetDetailPage({ params }: PageProps) {
             <p className="text-sm text-gray-600 whitespace-pre-wrap">{asset.notes}</p>
           </div>
         )}
+
+        {/* Documents */}
+        <AssetDocumentsSection assetId={id} />
       </div>
     </div>
   )
