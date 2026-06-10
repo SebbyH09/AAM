@@ -4,7 +4,7 @@ import { StatCard } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import {
   Package, FileText, Wrench,
-  Clock, AlertTriangle, CheckCircle, TrendingUp
+  Clock, AlertTriangle, CheckCircle, TrendingUp, Package2, FlaskConical
 } from 'lucide-react'
 import { formatDate, dueStatusBadge, statusColor } from '@/lib/utils'
 import Link from 'next/link'
@@ -28,6 +28,9 @@ export default async function DashboardPage() {
     { data: expiringContractsList },
     { data: openRepairsList },
     { data: activeDowntime },
+    { data: allParts },
+    { count: calibrationsDueSoon },
+    { data: calibrationsDueList },
   ] = await Promise.all([
     supabase.from('assets').select('*', { count: 'exact', head: true }),
     supabase.from('assets').select('*', { count: 'exact', head: true }).eq('status', 'active'),
@@ -60,7 +63,22 @@ export default async function DashboardPage() {
       .is('end_time', null)
       .order('start_time', { ascending: false })
       .limit(5),
+    supabase.from('parts').select('id, reorder_point, quantity_on_hand'),
+    supabase.from('calibration_records')
+      .select('*', { count: 'exact', head: true })
+      .gte('next_due_date', today)
+      .lte('next_due_date', in30Days),
+    supabase.from('calibration_records')
+      .select('*, assets(name, asset_tag)')
+      .gte('next_due_date', today)
+      .lte('next_due_date', in30Days)
+      .order('next_due_date')
+      .limit(5),
   ])
+
+  const lowStockCount = (allParts ?? []).filter(
+    (p: any) => p.reorder_point != null && p.quantity_on_hand <= p.reorder_point
+  ).length
 
   return (
     <div>
@@ -95,6 +113,20 @@ export default async function DashboardPage() {
             subtitle="Need attention"
             icon={<AlertTriangle className="h-6 w-6" />}
             color={overdueMaintenance ? 'red' : 'green'}
+          />
+          <StatCard
+            title="Low Stock Parts"
+            value={lowStockCount}
+            subtitle="At or below reorder point"
+            icon={<Package2 className="h-6 w-6" />}
+            color={lowStockCount > 0 ? 'orange' : 'green'}
+          />
+          <StatCard
+            title="Calibrations Due"
+            value={calibrationsDueSoon ?? 0}
+            subtitle="Next 30 days"
+            icon={<FlaskConical className="h-6 w-6" />}
+            color={(calibrationsDueSoon ?? 0) > 0 ? 'yellow' : 'green'}
           />
         </div>
 
@@ -212,6 +244,42 @@ export default async function DashboardPage() {
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <TrendingUp className="h-8 w-8 text-green-400 mb-2" />
                   <p className="text-sm text-gray-500">All assets operational</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Calibrations Due Soon */}
+          <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <div className="flex items-center gap-2">
+                <FlaskConical className="h-5 w-5 text-purple-600" />
+                <h2 className="font-semibold text-gray-900">Calibrations Due (30 days)</h2>
+              </div>
+              <Link href="/calibrations" className="text-sm text-blue-600 hover:text-blue-800">View all →</Link>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {calibrationsDueList && calibrationsDueList.length > 0 ? (
+                calibrationsDueList.map((cal: any) => {
+                  const badge = dueStatusBadge(cal.next_due_date)
+                  return (
+                    <div key={cal.id} className="flex items-center justify-between px-6 py-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {cal.assets?.name ?? 'Unknown Asset'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Due {formatDate(cal.next_due_date)} • {cal.performed_by}
+                        </p>
+                      </div>
+                      <Badge className={badge.color}>{badge.label}</Badge>
+                    </div>
+                  )
+                })
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <CheckCircle className="h-8 w-8 text-green-400 mb-2" />
+                  <p className="text-sm text-gray-500">No calibrations due soon</p>
                 </div>
               )}
             </div>

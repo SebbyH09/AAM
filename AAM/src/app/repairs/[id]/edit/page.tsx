@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Header from '@/components/layout/Header'
 import RepairForm from '../../RepairForm'
+import LaborLogSection from '../../LaborLogSection'
 import { notFound } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -23,8 +24,9 @@ export default async function EditRepairPage({ params }: PageProps) {
   return (
     <div>
       <Header title="Edit Repair" subtitle={repair.description} />
-      <div className="p-6">
+      <div className="p-6 space-y-6">
         <RepairForm assets={assets ?? []} repair={repair} />
+        <LaborLogSection repairId={id} />
       </div>
     </div>
   )

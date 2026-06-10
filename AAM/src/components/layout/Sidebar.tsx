@@ -14,6 +14,12 @@ import {
   Package,
   LogOut,
   X,
+  Calendar,
+  FlaskConical,
+  Building2,
+  Package2,
+  DollarSign,
+  BarChart3,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -27,6 +33,21 @@ const assetNavigation = [
   { name: 'Repairs', href: '/repairs', icon: Wrench },
   { name: 'Downtime', href: '/downtime', icon: Clock },
   { name: 'Notifications', href: '/notifications', icon: Bell },
+]
+
+const operationsNavigation = [
+  { name: 'Schedule', href: '/schedule', icon: Calendar },
+  { name: 'Calibrations', href: '/calibrations', icon: FlaskConical },
+]
+
+const resourcesNavigation = [
+  { name: 'Vendors', href: '/vendors', icon: Building2 },
+  { name: 'Parts Inventory', href: '/parts', icon: Package2 },
+  { name: 'Budgets', href: '/budgets', icon: DollarSign },
+]
+
+const analyticsNavigation = [
+  { name: 'Reports', href: '/reports', icon: BarChart3 },
 ]
 
 
@@ -63,33 +84,112 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Asset Manager</p>
-        <div className="space-y-1">
-          {assetNavigation.map((item) => {
-            const isActive = item.href === '/'
-              ? pathname === '/'
-              : pathname.startsWith(item.href)
-
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={onClose}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                )}
-              >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
-                {item.name}
-              </Link>
-            )
-          })}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
+        {/* Asset Manager section */}
+        <div>
+          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Asset Manager</p>
+          <div className="space-y-1">
+            {assetNavigation.map((item) => {
+              const isActive = item.href === '/'
+                ? pathname === '/'
+                : pathname.startsWith(item.href)
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={onClose}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  )}
+                >
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  {item.name}
+                </Link>
+              )
+            })}
+          </div>
         </div>
 
+        {/* Operations section */}
+        <div>
+          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Operations</p>
+          <div className="space-y-1">
+            {operationsNavigation.map((item) => {
+              const isActive = pathname.startsWith(item.href)
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={onClose}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  )}
+                >
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  {item.name}
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Resources section */}
+        <div>
+          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Resources</p>
+          <div className="space-y-1">
+            {resourcesNavigation.map((item) => {
+              const isActive = pathname.startsWith(item.href)
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={onClose}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  )}
+                >
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  {item.name}
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Analytics section */}
+        <div>
+          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Analytics</p>
+          <div className="space-y-1">
+            {analyticsNavigation.map((item) => {
+              const isActive = pathname.startsWith(item.href)
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={onClose}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  )}
+                >
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  {item.name}
+                </Link>
+              )
+            })}
+          </div>
+        </div>
       </nav>
 
       {/* Footer */}
