@@ -3,11 +3,15 @@ import Header from '@/components/layout/Header'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import ContractsClient from './ContractsClient'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ContractsPage() {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user?.user_metadata?.role !== 'admin') redirect('/')
 
   const { data: contracts } = await supabase
     .from('service_contracts')

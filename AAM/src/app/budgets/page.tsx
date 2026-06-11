@@ -5,11 +5,15 @@ import { Plus, DollarSign, TrendingUp } from 'lucide-react'
 import { StatCard } from '@/components/ui/Card'
 import { formatCurrency } from '@/lib/utils'
 import BudgetsClient from './BudgetsClient'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
 export default async function BudgetsPage() {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user?.user_metadata?.role !== 'admin') redirect('/')
   const currentYear = new Date().getFullYear()
 
   const [{ data: budgets }, { data: assets }] = await Promise.all([
