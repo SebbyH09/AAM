@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 import Link from 'next/link'
-import { Search, DollarSign, BarChart3, TableIcon, FileText, Wrench, ShieldCheck } from 'lucide-react'
+import { Search, DollarSign, BarChart3, Table2, FileText, Wrench, ShieldCheck } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface Asset {
@@ -251,7 +251,7 @@ export default function BudgetsClient({ budgets, spendingRecords }: BudgetsClien
               onClick={() => { setTableCategory(''); setTableSearch(''); setTableOpen(true) }}
               className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              <TableIcon className="h-4 w-4" />
+              <Table2 className="h-4 w-4" />
               Details
             </button>
           </div>
