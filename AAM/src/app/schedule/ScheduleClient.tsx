@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, statusColor } from '@/lib/utils'
-import { Calendar, List, ClipboardList, Wrench, FlaskConical, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Calendar, List, ClipboardList, Wrench, FlaskConical, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { startOfMonth, endOfMonth, eachDayOfInterval, format, isSameDay, addMonths, subMonths, parseISO } from 'date-fns'
 
 type EventType = 'maintenance' | 'repair' | 'calibration'
@@ -66,9 +66,10 @@ function groupByWeek(events: ScheduleEvent[], today: Date): { label: string; eve
 }
 
 export default function ScheduleClient({ events }: ScheduleClientProps) {
-  const [view, setView] = useState<'list' | 'calendar'>('list')
+  const [view, setView] = useState<'list' | 'calendar'>('calendar')
   const [typeFilter, setTypeFilter] = useState<'all' | EventType>('all')
   const [calendarMonth, setCalendarMonth] = useState(new Date())
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null)
 
   const filtered = useMemo(() => {
     if (typeFilter === 'all') return events
@@ -78,14 +79,12 @@ export default function ScheduleClient({ events }: ScheduleClientProps) {
   const today = new Date()
   const groups = useMemo(() => groupByWeek(filtered, today), [filtered])
 
-  // Calendar view
   const calendarDays = useMemo(() => {
     const start = startOfMonth(calendarMonth)
     const end = endOfMonth(calendarMonth)
     return eachDayOfInterval({ start, end })
   }, [calendarMonth])
 
-  // Pad days to start on Sunday
   const startPad = useMemo(() => {
     const day = startOfMonth(calendarMonth).getDay()
     return Array.from({ length: day }, (_, i) => i)
@@ -94,6 +93,8 @@ export default function ScheduleClient({ events }: ScheduleClientProps) {
   function eventsOnDay(day: Date) {
     return filtered.filter((e) => isSameDay(parseISO(e.date), day))
   }
+
+  const selectedDayEvents = selectedDay ? eventsOnDay(selectedDay) : []
 
   return (
     <div className="space-y-4">
@@ -222,7 +223,8 @@ export default function ScheduleClient({ events }: ScheduleClientProps) {
               return (
                 <div
                   key={day.toISOString()}
-                  className={`min-h-[80px] border-b border-r border-gray-100 p-1.5 ${
+                  onClick={() => setSelectedDay(day)}
+                  className={`min-h-[80px] border-b border-r border-gray-100 p-1.5 cursor-pointer transition-colors hover:bg-blue-50/60 ${
                     isToday ? 'bg-blue-50' : ''
                   }`}
                 >
@@ -231,15 +233,14 @@ export default function ScheduleClient({ events }: ScheduleClientProps) {
                   </div>
                   <div className="space-y-0.5">
                     {dayEvents.slice(0, 3).map((e) => (
-                      <Link
+                      <div
                         key={e.id}
-                        href={e.href}
-                        className={`block truncate rounded px-1 py-0.5 text-xs font-medium ${TYPE_COLORS[e.type]} hover:opacity-80`}
+                        className={`truncate rounded px-1 py-0.5 text-xs font-medium ${TYPE_COLORS[e.type]}`}
                         title={`${e.title} — ${e.assetName ?? ''}`}
                       >
                         <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${TYPE_DOT_COLORS[e.type]}`} />
                         {e.title}
-                      </Link>
+                      </div>
                     ))}
                     {dayEvents.length > 3 && (
                       <p className="text-xs text-gray-400 pl-1">+{dayEvents.length - 3} more</p>
@@ -248,6 +249,67 @@ export default function ScheduleClient({ events }: ScheduleClientProps) {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Day Events Modal */}
+      {selectedDay && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setSelectedDay(null) }}
+        >
+          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">
+                  {format(selectedDay, 'EEEE, MMMM d')}
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {selectedDayEvents.length === 0
+                    ? 'No events'
+                    : `${selectedDayEvents.length} event${selectedDayEvents.length !== 1 ? 's' : ''}`}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedDay(null)}
+                className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto p-4">
+              {selectedDayEvents.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <Calendar className="h-10 w-10 text-gray-200 mb-3" />
+                  <p className="text-sm text-gray-500">No events scheduled for this day</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedDayEvents.map((event) => (
+                    <Link
+                      key={event.id}
+                      href={event.href}
+                      onClick={() => setSelectedDay(null)}
+                      className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                    >
+                      <div className="mt-0.5 shrink-0">{TYPE_ICONS[event.type]}</div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-900 truncate">{event.title}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{event.assetName ?? 'No asset'}</p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <Badge className={TYPE_COLORS[event.type]}>{event.type}</Badge>
+                          {event.priority && (
+                            <Badge className={statusColor(event.priority)}>{event.priority}</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

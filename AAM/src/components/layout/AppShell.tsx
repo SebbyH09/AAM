@@ -5,7 +5,12 @@ import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import { MobileMenuContext } from '@/contexts/MobileMenuContext'
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+interface AppShellProps {
+  children: React.ReactNode
+  userRole: string | null
+}
+
+export default function AppShell({ children, userRole }: AppShellProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const isLoginPage = pathname === '/login'
@@ -19,7 +24,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen bg-gray-50">
         {/* Desktop sidebar */}
         <div className="hidden md:flex">
-          <Sidebar />
+          <Sidebar userRole={userRole} />
         </div>
 
         {/* Mobile backdrop */}
@@ -36,7 +41,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <Sidebar onClose={() => setMobileMenuOpen(false)} />
+          <Sidebar userRole={userRole} onClose={() => setMobileMenuOpen(false)} />
         </div>
 
         <main className="flex-1 overflow-auto">

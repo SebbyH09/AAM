@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const publicRoutes = ['/login', '/auth/callback']
+const adminOnlyRoutes = ['/contracts', '/budgets']
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -52,6 +53,16 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
+  }
+
+  // Enforce admin-only routes
+  if (user) {
+    const isAdminRoute = adminOnlyRoutes.some((route) => pathname.startsWith(route))
+    if (isAdminRoute && user.user_metadata?.role !== 'admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse
