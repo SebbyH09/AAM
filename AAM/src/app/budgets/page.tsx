@@ -9,6 +9,12 @@ import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
+function extractAssetName(raw: unknown): string | null {
+  if (!raw) return null
+  if (Array.isArray(raw)) return (raw[0] as { name?: string } | undefined)?.name ?? null
+  return (raw as { name?: string }).name ?? null
+}
+
 export default async function BudgetsPage() {
   const supabase = await createClient()
 
@@ -42,7 +48,7 @@ export default async function BudgetsPage() {
       id: c.id,
       category: 'contracts' as const,
       description: `${(c.contract_type as string).replace(/_/g, ' ')} — ${c.vendor_name}`,
-      asset_name: (c.assets as { name: string } | null)?.name ?? null,
+      asset_name: extractAssetName(c.assets),
       amount: (c.cost as number | null) ?? 0,
       date: c.start_date as string,
       status: c.status as string,
@@ -53,7 +59,7 @@ export default async function BudgetsPage() {
       id: m.id,
       category: 'maintenance' as const,
       description: m.description as string,
-      asset_name: (m.assets as { name: string } | null)?.name ?? null,
+      asset_name: extractAssetName(m.assets),
       amount: (m.cost as number | null) ?? 0,
       date: m.performed_date as string,
       status: m.status as string,
@@ -64,7 +70,7 @@ export default async function BudgetsPage() {
       id: r.id,
       category: 'repairs' as const,
       description: r.description as string,
-      asset_name: (r.assets as { name: string } | null)?.name ?? null,
+      asset_name: extractAssetName(r.assets),
       amount: (r.total_cost as number | null) ?? 0,
       date: r.reported_date as string,
       status: r.status as string,
