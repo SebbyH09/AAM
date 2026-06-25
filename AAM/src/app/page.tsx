@@ -10,6 +10,7 @@ import { formatDate, dueStatusBadge, statusColor } from '@/lib/utils'
 import Link from 'next/link'
 import { addDays } from 'date-fns'
 import DashboardMaintenanceSections from './DashboardMaintenanceSections'
+import DashboardNewItemModal from './DashboardNewItemModal'
 
 export const dynamic = 'force-dynamic'
 
@@ -82,7 +83,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <Header title="Dashboard" subtitle="Overview of your asset health and upcoming tasks" />
+      <Header title="Dashboard" subtitle="Overview of your asset health and upcoming tasks" actions={<DashboardNewItemModal />} />
 
       <div className="p-6 space-y-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
