@@ -10,7 +10,7 @@ import type { EmailContent } from './templates'
  */
 export async function sendEmail(to: string, content: EmailContent): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.NOTIFICATION_EMAIL_FROM ?? 'notifications@assetmanager.local'
+  const from = process.env.NOTIFICATION_EMAIL_FROM ?? 'notifications@email.aeraassetmanager.app'
 
   if (!apiKey || apiKey === 'your-resend-api-key') {
     console.log('[EMAIL NOTIFICATION]', {
