@@ -19,6 +19,26 @@ interface AssetsClientProps {
 type SortField = 'name' | 'category' | 'location' | 'status' | 'purchase_date' | 'date_installed'
 type SortDir = 'asc' | 'desc'
 
+const FILTERS_STORAGE_KEY = 'assets-list-filters'
+
+interface StoredFilters {
+  search: string
+  selectedCategory: string
+  selectedStatus: string
+  sortField: SortField
+  sortDir: SortDir
+}
+
+function loadStoredFilters(): Partial<StoredFilters> {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.sessionStorage.getItem(FILTERS_STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as Partial<StoredFilters>) : {}
+  } catch {
+    return {}
+  }
+}
+
 function exportAssets(assets: Asset[], format: 'xlsx' | 'csv') {
   const rows = assets.map((a) => ({
     'Name': a.name,
@@ -63,11 +83,12 @@ function exportAssets(assets: Asset[], format: 'xlsx' | 'csv') {
 
 export default function AssetsClient({ assets }: AssetsClientProps) {
   const router = useRouter()
-  const [search, setSearch] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('All')
-  const [selectedStatus, setSelectedStatus] = useState('all')
-  const [sortField, setSortField] = useState<SortField>('name')
-  const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [stored] = useState(loadStoredFilters)
+  const [search, setSearch] = useState(stored.search ?? '')
+  const [selectedCategory, setSelectedCategory] = useState(stored.selectedCategory ?? 'All')
+  const [selectedStatus, setSelectedStatus] = useState(stored.selectedStatus ?? 'all')
+  const [sortField, setSortField] = useState<SortField>(stored.sortField ?? 'name')
+  const [sortDir, setSortDir] = useState<SortDir>(stored.sortDir ?? 'asc')
   const [exportOpen, setExportOpen] = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
 
@@ -80,6 +101,17 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Persist search and filters so they survive navigating to an asset and back.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const toStore: StoredFilters = { search, selectedCategory, selectedStatus, sortField, sortDir }
+      window.sessionStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(toStore))
+    } catch {
+      // Ignore storage errors (e.g. private mode / quota).
+    }
+  }, [search, selectedCategory, selectedStatus, sortField, sortDir])
 
   const filtered = assets.filter((a) => {
     const matchSearch =
