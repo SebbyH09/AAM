@@ -90,6 +90,7 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
   const [sortField, setSortField] = useState<SortField>(stored.sortField ?? 'name')
   const [sortDir, setSortDir] = useState<SortDir>(stored.sortDir ?? 'asc')
   const [exportOpen, setExportOpen] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const exportRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -147,6 +148,41 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
     })
   }, [filtered, sortField, sortDir])
 
+  // Keep the selection in sync with the visible rows so a checked asset that is
+  // filtered out doesn't linger in a hidden selection.
+  const visibleIds = useMemo(() => new Set(sorted.map((a) => a.id)), [sorted])
+  const selectedVisible = useMemo(
+    () => sorted.filter((a) => selectedIds.has(a.id)),
+    [sorted, selectedIds],
+  )
+  const allVisibleSelected = sorted.length > 0 && selectedVisible.length === sorted.length
+  const someVisibleSelected = selectedVisible.length > 0 && !allVisibleSelected
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (allVisibleSelected) {
+        // Deselect only the currently visible rows.
+        visibleIds.forEach((id) => next.delete(id))
+      } else {
+        visibleIds.forEach((id) => next.add(id))
+      }
+      return next
+    })
+  }
+
+  // Export the checked assets when there's a selection, otherwise everything shown.
+  const exportRows = selectedVisible.length > 0 ? selectedVisible : sorted
+
   function toggleSort(field: SortField) {
     if (sortField === field) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -196,23 +232,28 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
           <div ref={exportRef} className="relative">
             <button
               onClick={() => setExportOpen((v) => !v)}
-              disabled={sorted.length === 0}
+              disabled={exportRows.length === 0}
               className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Download className="h-3.5 w-3.5" />
-              Export
+              {selectedVisible.length > 0 ? `Export (${selectedVisible.length})` : 'Export'}
               <ChevronDown className="h-3 w-3" />
             </button>
             {exportOpen && (
-              <div className="absolute right-0 top-full mt-1 z-10 w-44 rounded-lg border border-gray-200 bg-white shadow-lg">
+              <div className="absolute right-0 top-full mt-1 z-10 w-52 rounded-lg border border-gray-200 bg-white shadow-lg">
+                <p className="px-4 py-2 text-xs text-gray-500 border-b border-gray-100">
+                  {selectedVisible.length > 0
+                    ? `${selectedVisible.length} selected asset${selectedVisible.length === 1 ? '' : 's'}`
+                    : `All ${sorted.length} asset${sorted.length === 1 ? '' : 's'} shown`}
+                </p>
                 <button
-                  onClick={() => { exportAssets(sorted, 'xlsx'); setExportOpen(false) }}
-                  className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-t-lg"
+                  onClick={() => { exportAssets(exportRows, 'xlsx'); setExportOpen(false) }}
+                  className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                 >
                   Export as Excel
                 </button>
                 <button
-                  onClick={() => { exportAssets(sorted, 'csv'); setExportOpen(false) }}
+                  onClick={() => { exportAssets(exportRows, 'csv'); setExportOpen(false) }}
                   className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-b-lg border-t border-gray-100"
                 >
                   Export as CSV
@@ -243,6 +284,16 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-6 py-3 text-left w-10">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all assets"
+                    checked={allVisibleSelected}
+                    ref={(el) => { if (el) el.indeterminate = someVisibleSelected }}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left">
                   <button onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700">
                     Asset <SortIcon field="name" />
@@ -281,8 +332,19 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
                 <tr
                   key={asset.id}
                   onClick={() => router.push(`/assets/${asset.id}`)}
-                  className="hover:bg-gray-50 transition-colors cursor-pointer"
+                  className={`transition-colors cursor-pointer ${
+                    selectedIds.has(asset.id) ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'
+                  }`}
                 >
+                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${asset.name}`}
+                      checked={selectedIds.has(asset.id)}
+                      onChange={() => toggleSelect(asset.id)}
+                      className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </td>
                   <td className="px-6 py-4">
                     <div>
                       <p className="text-sm font-medium text-gray-900">{asset.name}</p>
