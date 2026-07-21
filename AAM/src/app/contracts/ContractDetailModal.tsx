@@ -43,6 +43,14 @@ interface Contract {
   assets: { name: string; asset_tag: string | null } | null
   service_contract_assets?: LinkedAsset[]
   renewed_from_contract_id?: string | null
+  renewed_at?: string | null
+}
+
+const RECENT_RENEWAL_DAYS = 7
+
+function isRecentlyRenewed(contract: Contract): boolean {
+  if (!contract.renewed_at) return false
+  return differenceInDays(new Date(), parseISO(contract.renewed_at)) < RECENT_RENEWAL_DAYS
 }
 
 interface ServiceReport {
@@ -221,10 +229,10 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
             <div className="flex items-center gap-2 flex-wrap">
               <Badge className={statusColor(contract.status)}>{contract.status}</Badge>
               <Badge className="bg-gray-100 text-gray-700 capitalize">{contract.contract_type.replace(/_/g, ' ')}</Badge>
-              {contract.renewed_from_contract_id && (
+              {isRecentlyRenewed(contract) && (
                 <Badge className="bg-purple-100 text-purple-700 flex items-center gap-1">
                   <RefreshCw className="h-3 w-3" />
-                  Renewal
+                  Renewed
                 </Badge>
               )}
               {contract.file_name && (

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/Badge'
 import { formatDate, statusColor } from '@/lib/utils'
 import { Asset } from '@/types/database'
 import Link from 'next/link'
-import { Search, Package, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Download, ChevronDown } from 'lucide-react'
+import { Search, Package, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Download, ChevronDown, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
 const CATEGORIES = ['All', 'Analytical', 'Lab Equipment', 'HVAC', 'IT/Network', 'Electrical', 'Mechanical', 'Other']
@@ -210,8 +210,18 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
             placeholder="Search by name, tag, serial, model, location, manufacturer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-9 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
         <div className="flex gap-2 flex-wrap items-center">
           {STATUSES.map((s) => (

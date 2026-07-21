@@ -121,6 +121,7 @@ export default function RenewContractModal({ contract, onClose, onRenewed }: Ren
         status: newStatus,
         pm_interval_months: parseInt(form.pm_interval_months) || 12,
         notes: form.notes || null,
+        renewed_at: new Date().toISOString(),
       })
       .eq('id', contract.id)
 

@@ -39,6 +39,15 @@ interface Contract {
   assets: { name: string; asset_tag: string | null; serial_number: string | null; model: string | null } | null
   service_contract_assets?: LinkedAsset[]
   renewed_from_contract_id?: string | null
+  renewed_at?: string | null
+}
+
+// Contracts renewed within this window are pinned to the top of the list.
+const RECENT_RENEWAL_DAYS = 7
+
+function isRecentlyRenewed(contract: Contract): boolean {
+  if (!contract.renewed_at) return false
+  return differenceInDays(new Date(), parseISO(contract.renewed_at)) < RECENT_RENEWAL_DAYS
 }
 
 function getLinkedAssetNames(contract: Contract): string {
@@ -114,6 +123,19 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
     return matchSearch && matchStatus
   })
 
+  // Pin contracts renewed within the last 7 days to the top (most recently renewed
+  // first); everything else keeps the incoming order (by end date).
+  const sorted = [...filtered].sort((a, b) => {
+    const aRenewed = isRecentlyRenewed(a)
+    const bRenewed = isRecentlyRenewed(b)
+    if (aRenewed && bRenewed) {
+      return parseISO(b.renewed_at!).getTime() - parseISO(a.renewed_at!).getTime()
+    }
+    if (aRenewed) return -1
+    if (bRenewed) return 1
+    return 0
+  })
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -142,7 +164,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {sorted.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
           <FileText className="h-12 w-12 text-gray-300 mb-3" />
           <p className="text-sm font-medium text-gray-600">No contracts found</p>
@@ -169,7 +191,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map((contract) => {
+              {sorted.map((contract) => {
                 const badge = dueStatusBadge(contract.end_date)
                 const pm = getPmStatus(contract)
                 const assetNames = getLinkedAssetNames(contract)
@@ -233,10 +255,10 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
                         <Badge className={statusColor(contract.status)}>{contract.status}</Badge>
-                        {contract.renewed_from_contract_id && (
+                        {isRecentlyRenewed(contract) && (
                           <Badge className="bg-purple-100 text-purple-700 text-[10px] flex items-center gap-0.5 w-fit">
                             <RefreshCw className="h-2.5 w-2.5" />
-                            Renewal
+                            Renewed
                           </Badge>
                         )}
                       </div>
