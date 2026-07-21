@@ -50,10 +50,6 @@ export default function RenewContractModal({ contract, onClose, onRenewed }: Ren
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const linkedAssetIds: string[] = contract.service_contract_assets
-    ?.filter((la) => la.assets)
-    .map((la) => la.asset_id) ?? (contract.asset_id ? [contract.asset_id] : [])
-
   const linkedAssetNames = contract.service_contract_assets
     ?.filter((la) => la.assets)
     .map((la) => la.assets!.name)
@@ -105,11 +101,13 @@ export default function RenewContractModal({ contract, onClose, onRenewed }: Ren
     const today = new Date().toISOString().split('T')[0]
     const newStatus = form.start_date <= today ? 'active' : 'pending'
 
-    // Create the renewal contract
-    const { data: newContract, error: createError } = await supabase
+    // Overwrite the existing contract in place with the new period and terms.
+    // The contract id is preserved, so the PM history (pm_last_performed_date and the
+    // per-asset dates in service_contract_assets) and all linked service_reports carry
+    // over to the renewed contract untouched.
+    const { error: updateError } = await supabase
       .from('service_contracts')
-      .insert({
-        asset_id: linkedAssetIds[0] ?? null,
+      .update({
         contract_number: form.contract_number || null,
         vendor_name: form.vendor_name,
         vendor_contact: form.vendor_contact || null,
@@ -123,40 +121,11 @@ export default function RenewContractModal({ contract, onClose, onRenewed }: Ren
         status: newStatus,
         pm_interval_months: parseInt(form.pm_interval_months) || 12,
         notes: form.notes || null,
-        renewed_from_contract_id: contract.id,
       })
-      .select('id')
-      .single()
-
-    if (createError || !newContract) {
-      setError(createError?.message ?? 'Failed to create renewal contract.')
-      setLoading(false)
-      return
-    }
-
-    // Copy asset links to new contract
-    if (linkedAssetIds.length > 0) {
-      const { error: linkError } = await supabase.from('service_contract_assets').insert(
-        linkedAssetIds.map((assetId) => ({
-          service_contract_id: newContract.id,
-          asset_id: assetId,
-        }))
-      )
-      if (linkError) {
-        setError(linkError.message)
-        setLoading(false)
-        return
-      }
-    }
-
-    // Expire the old contract
-    const { error: expireError } = await supabase
-      .from('service_contracts')
-      .update({ status: 'expired' })
       .eq('id', contract.id)
 
-    if (expireError) {
-      setError(expireError.message)
+    if (updateError) {
+      setError(updateError.message)
       setLoading(false)
       return
     }
@@ -187,8 +156,9 @@ export default function RenewContractModal({ contract, onClose, onRenewed }: Ren
 
         <div className="max-h-[80vh] overflow-y-auto px-6 py-5">
           <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-3 text-sm text-blue-700">
-            The current contract will be marked <strong>expired</strong> and a new renewal contract will be created.
-            If the new start date is in the future, the renewal will be set to <strong>pending</strong> until it begins.
+            This updates the existing contract in place with the new period and terms, keeping its
+            <strong> PM history</strong> and all <strong>service reports</strong>.
+            If the new start date is in the future, the contract will be set to <strong>pending</strong> until it begins.
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

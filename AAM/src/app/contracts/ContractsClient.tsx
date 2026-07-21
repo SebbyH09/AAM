@@ -58,18 +58,33 @@ function getLinkedAssetIds(contract: Contract): string[] {
   return contract.asset_id ? [contract.asset_id] : []
 }
 
-function getPmStatus(contract: Contract): { label: string; nextDate: string; color: string } | null {
-  if (!contract.pm_last_performed_date) return null
-  const lastDate = parseISO(contract.pm_last_performed_date)
-  const nextDate = addMonths(lastDate, contract.pm_interval_months)
+function getPmStatus(contract: Contract): { label: string; nextDate: string; lastDate: string; color: string } | null {
+  // When a contract covers multiple assets, each asset tracks its own last PM date.
+  // Use the oldest of those (which yields the soonest upcoming PM date) so the status
+  // reflects the most urgent unit rather than whichever was serviced most recently.
+  const perAssetDates = (contract.service_contract_assets ?? [])
+    .filter((la) => la.assets && la.pm_last_performed_date)
+    .map((la) => parseISO(la.pm_last_performed_date!))
+
+  const lastDates = perAssetDates.length > 0
+    ? perAssetDates
+    : contract.pm_last_performed_date
+      ? [parseISO(contract.pm_last_performed_date)]
+      : []
+
+  if (lastDates.length === 0) return null
+
+  const oldestLast = lastDates.reduce((a, b) => (a < b ? a : b))
+  const nextDate = addMonths(oldestLast, contract.pm_interval_months)
   const daysLeft = differenceInDays(nextDate, new Date())
   const nextFormatted = format(nextDate, 'MMM d, yyyy')
+  const lastFormatted = format(oldestLast, 'MMM d, yyyy')
 
-  if (daysLeft < 0) return { label: `${Math.abs(daysLeft)}d overdue`, nextDate: nextFormatted, color: 'bg-red-100 text-red-800' }
-  if (daysLeft === 0) return { label: 'Due today', nextDate: nextFormatted, color: 'bg-red-100 text-red-800' }
-  if (daysLeft <= 30) return { label: `${daysLeft}d left`, nextDate: nextFormatted, color: 'bg-orange-100 text-orange-800' }
-  if (daysLeft <= 90) return { label: `${daysLeft}d left`, nextDate: nextFormatted, color: 'bg-yellow-100 text-yellow-800' }
-  return { label: `${daysLeft}d left`, nextDate: nextFormatted, color: 'bg-green-100 text-green-800' }
+  if (daysLeft < 0) return { label: `${Math.abs(daysLeft)}d overdue`, nextDate: nextFormatted, lastDate: lastFormatted, color: 'bg-red-100 text-red-800' }
+  if (daysLeft === 0) return { label: 'Due today', nextDate: nextFormatted, lastDate: lastFormatted, color: 'bg-red-100 text-red-800' }
+  if (daysLeft <= 30) return { label: `${daysLeft}d left`, nextDate: nextFormatted, lastDate: lastFormatted, color: 'bg-orange-100 text-orange-800' }
+  if (daysLeft <= 90) return { label: `${daysLeft}d left`, nextDate: nextFormatted, lastDate: lastFormatted, color: 'bg-yellow-100 text-yellow-800' }
+  return { label: `${daysLeft}d left`, nextDate: nextFormatted, lastDate: lastFormatted, color: 'bg-green-100 text-green-800' }
 }
 
 interface ContractsClientProps {
@@ -209,7 +224,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                             {pm.label}
                           </Badge>
                           <span className="text-[11px] text-gray-500">Next: {pm.nextDate}</span>
-                          <span className="text-[11px] text-gray-400">Last: {formatDate(contract.pm_last_performed_date)}</span>
+                          <span className="text-[11px] text-gray-400">Last: {pm.lastDate}</span>
                         </div>
                       ) : (
                         <span className="text-xs text-gray-400">Not set</span>

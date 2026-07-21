@@ -84,11 +84,25 @@ function getLinkedAssetIds(contract: Contract): string[] {
 }
 
 function getPmInfo(contract: Contract) {
-  if (!contract.pm_last_performed_date) return null
-  const lastDate = parseISO(contract.pm_last_performed_date)
-  const nextDate = addMonths(lastDate, contract.pm_interval_months)
+  // For multi-asset contracts, use the oldest per-asset PM date so the status reflects
+  // the soonest upcoming PM across all covered units. Falls back to the contract-level date.
+  const perAssetDates = (contract.service_contract_assets ?? [])
+    .filter((la) => la.assets && la.pm_last_performed_date)
+    .map((la) => parseISO(la.pm_last_performed_date!))
+
+  const lastDates = perAssetDates.length > 0
+    ? perAssetDates
+    : contract.pm_last_performed_date
+      ? [parseISO(contract.pm_last_performed_date)]
+      : []
+
+  if (lastDates.length === 0) return null
+
+  const oldestLast = lastDates.reduce((a, b) => (a < b ? a : b))
+  const nextDate = addMonths(oldestLast, contract.pm_interval_months)
   const daysLeft = differenceInDays(nextDate, new Date())
   const nextFormatted = format(nextDate, 'MMM d, yyyy')
+  const lastFormatted = format(oldestLast, 'MMM d, yyyy')
 
   let color = 'bg-green-100 text-green-800'
   let label = `${daysLeft}d left`
@@ -97,7 +111,7 @@ function getPmInfo(contract: Contract) {
   else if (daysLeft <= 30) { color = 'bg-orange-100 text-orange-800' }
   else if (daysLeft <= 90) { color = 'bg-yellow-100 text-yellow-800' }
 
-  return { label, nextDate: nextFormatted, color, daysLeft }
+  return { label, nextDate: nextFormatted, lastDate: lastFormatted, color, daysLeft }
 }
 
 export default function ContractDetailModal({ contract, onClose, onDeleted }: ContractDetailModalProps) {
@@ -303,7 +317,7 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
                   </div>
                   <div>
                     <span className="text-xs text-gray-500">Last Performed</span>
-                    <p className="mt-0.5 text-gray-700">{formatDate(contract.pm_last_performed_date)}</p>
+                    <p className="mt-0.5 text-gray-700">{pm.lastDate}</p>
                   </div>
                 </div>
               ) : (
