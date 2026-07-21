@@ -43,6 +43,7 @@ create table service_contracts (
   pm_last_performed_date date,
   pm_interval_months integer not null default 12,
   notes text,
+  renewed_at timestamptz,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

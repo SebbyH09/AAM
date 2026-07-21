@@ -39,6 +39,15 @@ interface Contract {
   assets: { name: string; asset_tag: string | null; serial_number: string | null; model: string | null } | null
   service_contract_assets?: LinkedAsset[]
   renewed_from_contract_id?: string | null
+  renewed_at?: string | null
+}
+
+// Contracts renewed within this window are pinned to the top of the list.
+const RECENT_RENEWAL_DAYS = 7
+
+function isRecentlyRenewed(contract: Contract): boolean {
+  if (!contract.renewed_at) return false
+  return differenceInDays(new Date(), parseISO(contract.renewed_at)) < RECENT_RENEWAL_DAYS
 }
 
 function getLinkedAssetNames(contract: Contract): string {
@@ -58,18 +67,33 @@ function getLinkedAssetIds(contract: Contract): string[] {
   return contract.asset_id ? [contract.asset_id] : []
 }
 
-function getPmStatus(contract: Contract): { label: string; nextDate: string; color: string } | null {
-  if (!contract.pm_last_performed_date) return null
-  const lastDate = parseISO(contract.pm_last_performed_date)
-  const nextDate = addMonths(lastDate, contract.pm_interval_months)
+function getPmStatus(contract: Contract): { label: string; nextDate: string; lastDate: string; color: string } | null {
+  // When a contract covers multiple assets, each asset tracks its own last PM date.
+  // Use the oldest of those (which yields the soonest upcoming PM date) so the status
+  // reflects the most urgent unit rather than whichever was serviced most recently.
+  const perAssetDates = (contract.service_contract_assets ?? [])
+    .filter((la) => la.assets && la.pm_last_performed_date)
+    .map((la) => parseISO(la.pm_last_performed_date!))
+
+  const lastDates = perAssetDates.length > 0
+    ? perAssetDates
+    : contract.pm_last_performed_date
+      ? [parseISO(contract.pm_last_performed_date)]
+      : []
+
+  if (lastDates.length === 0) return null
+
+  const oldestLast = lastDates.reduce((a, b) => (a < b ? a : b))
+  const nextDate = addMonths(oldestLast, contract.pm_interval_months)
   const daysLeft = differenceInDays(nextDate, new Date())
   const nextFormatted = format(nextDate, 'MMM d, yyyy')
+  const lastFormatted = format(oldestLast, 'MMM d, yyyy')
 
-  if (daysLeft < 0) return { label: `${Math.abs(daysLeft)}d overdue`, nextDate: nextFormatted, color: 'bg-red-100 text-red-800' }
-  if (daysLeft === 0) return { label: 'Due today', nextDate: nextFormatted, color: 'bg-red-100 text-red-800' }
-  if (daysLeft <= 30) return { label: `${daysLeft}d left`, nextDate: nextFormatted, color: 'bg-orange-100 text-orange-800' }
-  if (daysLeft <= 90) return { label: `${daysLeft}d left`, nextDate: nextFormatted, color: 'bg-yellow-100 text-yellow-800' }
-  return { label: `${daysLeft}d left`, nextDate: nextFormatted, color: 'bg-green-100 text-green-800' }
+  if (daysLeft < 0) return { label: `${Math.abs(daysLeft)}d overdue`, nextDate: nextFormatted, lastDate: lastFormatted, color: 'bg-red-100 text-red-800' }
+  if (daysLeft === 0) return { label: 'Due today', nextDate: nextFormatted, lastDate: lastFormatted, color: 'bg-red-100 text-red-800' }
+  if (daysLeft <= 30) return { label: `${daysLeft}d left`, nextDate: nextFormatted, lastDate: lastFormatted, color: 'bg-orange-100 text-orange-800' }
+  if (daysLeft <= 90) return { label: `${daysLeft}d left`, nextDate: nextFormatted, lastDate: lastFormatted, color: 'bg-yellow-100 text-yellow-800' }
+  return { label: `${daysLeft}d left`, nextDate: nextFormatted, lastDate: lastFormatted, color: 'bg-green-100 text-green-800' }
 }
 
 interface ContractsClientProps {
@@ -97,6 +121,19 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
       (c.assets?.model?.toLowerCase().includes(q))
     const matchStatus = statusFilter === 'all' || c.status === statusFilter
     return matchSearch && matchStatus
+  })
+
+  // Pin contracts renewed within the last 7 days to the top (most recently renewed
+  // first); everything else keeps the incoming order (by end date).
+  const sorted = [...filtered].sort((a, b) => {
+    const aRenewed = isRecentlyRenewed(a)
+    const bRenewed = isRecentlyRenewed(b)
+    if (aRenewed && bRenewed) {
+      return parseISO(b.renewed_at!).getTime() - parseISO(a.renewed_at!).getTime()
+    }
+    if (aRenewed) return -1
+    if (bRenewed) return 1
+    return 0
   })
 
   return (
@@ -127,7 +164,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {sorted.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
           <FileText className="h-12 w-12 text-gray-300 mb-3" />
           <p className="text-sm font-medium text-gray-600">No contracts found</p>
@@ -154,7 +191,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map((contract) => {
+              {sorted.map((contract) => {
                 const badge = dueStatusBadge(contract.end_date)
                 const pm = getPmStatus(contract)
                 const assetNames = getLinkedAssetNames(contract)
@@ -209,7 +246,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                             {pm.label}
                           </Badge>
                           <span className="text-[11px] text-gray-500">Next: {pm.nextDate}</span>
-                          <span className="text-[11px] text-gray-400">Last: {formatDate(contract.pm_last_performed_date)}</span>
+                          <span className="text-[11px] text-gray-400">Last: {pm.lastDate}</span>
                         </div>
                       ) : (
                         <span className="text-xs text-gray-400">Not set</span>
@@ -218,10 +255,10 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
                         <Badge className={statusColor(contract.status)}>{contract.status}</Badge>
-                        {contract.renewed_from_contract_id && (
+                        {isRecentlyRenewed(contract) && (
                           <Badge className="bg-purple-100 text-purple-700 text-[10px] flex items-center gap-0.5 w-fit">
                             <RefreshCw className="h-2.5 w-2.5" />
-                            Renewal
+                            Renewed
                           </Badge>
                         )}
                       </div>
