@@ -178,9 +178,57 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
   async function handleDelete() {
     setDeleting(true)
     setActionError('')
-    const { error } = await supabase.from('service_contracts').delete().eq('id', contract.id)
+
+    // Clear/remove everything that references this contract before deleting it.
+    // Some of these foreign keys don't reliably cascade in the deployed schema, so a
+    // leftover reference would make the delete fail (or silently affect no rows).
+
+    // Delete associated service reports (the confirmation text promises this).
+    const { error: reportsError } = await supabase
+      .from('service_reports')
+      .delete()
+      .eq('service_contract_id', contract.id)
+    if (reportsError) {
+      setActionError(reportsError.message)
+      setDeleting(false)
+      return
+    }
+
+    // Remove asset links (junction rows).
+    const { error: linksError } = await supabase
+      .from('service_contract_assets')
+      .delete()
+      .eq('service_contract_id', contract.id)
+    if (linksError) {
+      setActionError(linksError.message)
+      setDeleting(false)
+      return
+    }
+
+    // Detach any contracts renewed from this one so the self-reference doesn't block deletion.
+    const { error: renewalError } = await supabase
+      .from('service_contracts')
+      .update({ renewed_from_contract_id: null })
+      .eq('renewed_from_contract_id', contract.id)
+    if (renewalError) {
+      setActionError(renewalError.message)
+      setDeleting(false)
+      return
+    }
+
+    // Delete the contract, returning the deleted row so we can confirm it actually happened.
+    const { data, error } = await supabase
+      .from('service_contracts')
+      .delete()
+      .eq('id', contract.id)
+      .select('id')
     if (error) {
       setActionError(error.message)
+      setDeleting(false)
+      return
+    }
+    if (!data || data.length === 0) {
+      setActionError('The contract could not be deleted. It may be referenced by other records, or you may not have permission to delete it.')
       setDeleting(false)
       return
     }
