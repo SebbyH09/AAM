@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge } from '@/lib/utils'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Search, FileText, ChevronRight, Paperclip, Wrench, RefreshCw } from 'lucide-react'
+import { Search, FileText, ChevronRight, Paperclip, Wrench, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { addMonths, parseISO, differenceInDays, format } from 'date-fns'
 import ContractDetailModal from './ContractDetailModal'
@@ -67,10 +67,11 @@ function getLinkedAssetIds(contract: Contract): string[] {
   return contract.asset_id ? [contract.asset_id] : []
 }
 
-function getPmStatus(contract: Contract): { label: string; nextDate: string; lastDate: string; color: string } | null {
-  // When a contract covers multiple assets, each asset tracks its own last PM date.
-  // Use the oldest of those (which yields the soonest upcoming PM date) so the status
-  // reflects the most urgent unit rather than whichever was serviced most recently.
+// When a contract covers multiple assets, each asset tracks its own last PM date.
+// Return the oldest of those (which yields the soonest upcoming PM date) so the
+// status reflects the most urgent unit rather than whichever was serviced most
+// recently. Returns null when no PM has been logged.
+function getPmLastDate(contract: Contract): Date | null {
   const perAssetDates = (contract.service_contract_assets ?? [])
     .filter((la) => la.assets && la.pm_last_performed_date)
     .map((la) => parseISO(la.pm_last_performed_date!))
@@ -83,7 +84,19 @@ function getPmStatus(contract: Contract): { label: string; nextDate: string; las
 
   if (lastDates.length === 0) return null
 
-  const oldestLast = lastDates.reduce((a, b) => (a < b ? a : b))
+  return lastDates.reduce((a, b) => (a < b ? a : b))
+}
+
+// Upcoming PM date (last PM + interval), or null when no PM has been logged.
+function getPmNextDate(contract: Contract): Date | null {
+  const oldestLast = getPmLastDate(contract)
+  return oldestLast ? addMonths(oldestLast, contract.pm_interval_months) : null
+}
+
+function getPmStatus(contract: Contract): { label: string; nextDate: string; lastDate: string; color: string } | null {
+  const oldestLast = getPmLastDate(contract)
+  if (!oldestLast) return null
+
   const nextDate = addMonths(oldestLast, contract.pm_interval_months)
   const daysLeft = differenceInDays(nextDate, new Date())
   const nextFormatted = format(nextDate, 'MMM d, yyyy')
@@ -100,6 +113,40 @@ interface ContractsClientProps {
   contracts: Contract[]
 }
 
+type SortField = 'assets' | 'type' | 'period' | 'expiry' | 'cost' | 'pm' | 'status'
+type SortDir = 'asc' | 'desc'
+
+// Compare two contracts on a given column (ascending). Missing values (no cost /
+// no PM logged) sort last in ascending order; the caller negates for descending.
+function compareContracts(a: Contract, b: Contract, field: SortField): number {
+  switch (field) {
+    case 'assets':
+      return getLinkedAssetNames(a).toLowerCase().localeCompare(getLinkedAssetNames(b).toLowerCase())
+    case 'type':
+      return a.contract_type.toLowerCase().localeCompare(b.contract_type.toLowerCase())
+    case 'period':
+      return parseISO(a.start_date).getTime() - parseISO(b.start_date).getTime()
+    case 'expiry':
+      return parseISO(a.end_date).getTime() - parseISO(b.end_date).getTime()
+    case 'cost': {
+      if (a.cost == null && b.cost == null) return 0
+      if (a.cost == null) return 1
+      if (b.cost == null) return -1
+      return a.cost - b.cost
+    }
+    case 'pm': {
+      const aNext = getPmNextDate(a)
+      const bNext = getPmNextDate(b)
+      if (!aNext && !bNext) return 0
+      if (!aNext) return 1
+      if (!bNext) return -1
+      return aNext.getTime() - bNext.getTime()
+    }
+    case 'status':
+      return a.status.toLowerCase().localeCompare(b.status.toLowerCase())
+  }
+}
+
 const STATUS_FILTERS = ['all', 'active', 'expired', 'pending']
 
 export default function ContractsClient({ contracts }: ContractsClientProps) {
@@ -108,6 +155,9 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null)
+  // Default to expiry ascending, which matches the order the rows arrive in.
+  const [sortField, setSortField] = useState<SortField>('expiry')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
 
   const filtered = contracts.filter((c) => {
     const q = search.toLowerCase()
@@ -124,17 +174,36 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
   })
 
   // Pin contracts renewed within the last 7 days to the top (most recently renewed
-  // first); everything else keeps the incoming order (by end date).
-  const sorted = [...filtered].sort((a, b) => {
-    const aRenewed = isRecentlyRenewed(a)
-    const bRenewed = isRecentlyRenewed(b)
-    if (aRenewed && bRenewed) {
-      return parseISO(b.renewed_at!).getTime() - parseISO(a.renewed_at!).getTime()
+  // first); everything else is ordered by the selected sort column.
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const aRenewed = isRecentlyRenewed(a)
+      const bRenewed = isRecentlyRenewed(b)
+      if (aRenewed && bRenewed) {
+        return parseISO(b.renewed_at!).getTime() - parseISO(a.renewed_at!).getTime()
+      }
+      if (aRenewed) return -1
+      if (bRenewed) return 1
+      const cmp = compareContracts(a, b, sortField)
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [filtered, sortField, sortDir])
+
+  function toggleSort(field: SortField) {
+    if (sortField === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDir('asc')
     }
-    if (aRenewed) return -1
-    if (bRenewed) return 1
-    return 0
-  })
+  }
+
+  function SortIcon({ field }: { field: SortField }) {
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-gray-400" />
+    return sortDir === 'asc'
+      ? <ArrowUp className="h-3 w-3 text-blue-600" />
+      : <ArrowDown className="h-3 w-3 text-blue-600" />
+  }
 
   return (
     <div className="space-y-4">
@@ -180,13 +249,41 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Assets / Vendor</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Period</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Expiry</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Cost</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">PM Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
+                <th className="px-6 py-3 text-left">
+                  <button onClick={() => toggleSort('assets')} className="inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700">
+                    Assets / Vendor <SortIcon field="assets" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left">
+                  <button onClick={() => toggleSort('type')} className="inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700">
+                    Type <SortIcon field="type" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left">
+                  <button onClick={() => toggleSort('period')} className="inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700">
+                    Period <SortIcon field="period" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left">
+                  <button onClick={() => toggleSort('expiry')} className="inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700">
+                    Expiry <SortIcon field="expiry" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left">
+                  <button onClick={() => toggleSort('cost')} className="inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700">
+                    Cost <SortIcon field="cost" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left">
+                  <button onClick={() => toggleSort('pm')} className="inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700">
+                    PM Status <SortIcon field="pm" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left">
+                  <button onClick={() => toggleSort('status')} className="inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700">
+                    Status <SortIcon field="status" />
+                  </button>
+                </th>
                 <th className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
