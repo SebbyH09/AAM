@@ -28,6 +28,7 @@ interface Contract {
 interface LogContractPmModalProps {
   contract: Contract
   onClose: () => void
+  onLogged?: () => void
 }
 
 const STATUS_OPTIONS = [
@@ -36,7 +37,7 @@ const STATUS_OPTIONS = [
   { value: 'requires_followup', label: 'Requires Follow-up' },
 ]
 
-export default function LogContractPmModal({ contract, onClose }: LogContractPmModalProps) {
+export default function LogContractPmModal({ contract, onClose, onLogged }: LogContractPmModalProps) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
@@ -148,6 +149,7 @@ export default function LogContractPmModal({ contract, onClose }: LogContractPmM
       notes: form.notes || null,
     })
 
+    onLogged?.()
     router.refresh()
     onClose()
   }
