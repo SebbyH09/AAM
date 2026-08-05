@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/Badge'
@@ -69,6 +69,11 @@ interface ServiceReport {
   file_name: string | null
 }
 
+// Mirrors the select used by the contracts page so the modal can re-fetch a
+// single contract (with its linked assets) after an in-modal update.
+const CONTRACT_SELECT =
+  '*, assets(name, asset_tag, serial_number, model), service_contract_assets(asset_id, pm_last_performed_date, assets(id, name, asset_tag, serial_number, model))'
+
 interface ContractDetailModalProps {
   contract: Contract
   onClose: () => void
@@ -122,9 +127,13 @@ function getPmInfo(contract: Contract) {
   return { label, nextDate: nextFormatted, lastDate: lastFormatted, color, daysLeft }
 }
 
-export default function ContractDetailModal({ contract, onClose, onDeleted }: ContractDetailModalProps) {
+export default function ContractDetailModal({ contract: initialContract, onClose, onDeleted }: ContractDetailModalProps) {
   const router = useRouter()
   const supabase = createClient()
+  // Keep a local, refreshable copy of the contract so in-modal actions (logging a
+  // PM, adding/renewing) update what's shown without closing and reopening. The
+  // prop only changes when a different contract is selected.
+  const [contract, setContract] = useState<Contract>(initialContract)
   const [reports, setReports] = useState<ServiceReport[]>([])
   const [loadingReports, setLoadingReports] = useState(true)
   const [showAddReport, setShowAddReport] = useState(false)
@@ -145,20 +154,42 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
     return () => { document.body.style.overflow = '' }
   }, [])
 
+  // Re-seed local state when a different contract is opened.
   useEffect(() => {
-    loadReports()
-  }, [contract.id])
+    setContract(initialContract)
+  }, [initialContract])
 
-  async function loadReports() {
+  const loadReports = useCallback(async () => {
     setLoadingReports(true)
     const { data } = await supabase
       .from('service_reports')
       .select('id, report_date, technician, type, summary, findings, recommendations, parts_used, labor_hours, cost, status, file_path, file_name')
-      .eq('service_contract_id', contract.id)
+      .eq('service_contract_id', initialContract.id)
       .order('report_date', { ascending: false })
     setReports(data ?? [])
     setLoadingReports(false)
-  }
+  }, [supabase, initialContract.id])
+
+  // Re-fetch the contract (PM dates, per-asset dates, status, etc.) after an
+  // in-modal update so the displayed details stay in sync with the database.
+  const refreshContract = useCallback(async () => {
+    const { data } = await supabase
+      .from('service_contracts')
+      .select(CONTRACT_SELECT)
+      .eq('id', initialContract.id)
+      .single()
+    if (data) setContract(data as Contract)
+  }, [supabase, initialContract.id])
+
+  // Called whenever something inside the modal changes the contract: refresh both
+  // the contract details and the service-report list together.
+  const handleUpdated = useCallback(async () => {
+    await Promise.all([refreshContract(), loadReports()])
+  }, [refreshContract, loadReports])
+
+  useEffect(() => {
+    loadReports()
+  }, [loadReports])
 
   async function openFile() {
     if (!contract.file_path) return
@@ -506,7 +537,7 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
               : undefined
           }
           onClose={() => setShowAddReport(false)}
-          onSaved={loadReports}
+          onSaved={handleUpdated}
         />
       )}
 
@@ -525,6 +556,7 @@ export default function ContractDetailModal({ contract, onClose, onDeleted }: Co
             })),
           }}
           onClose={() => setShowLogPm(false)}
+          onLogged={handleUpdated}
         />
       )}
 
