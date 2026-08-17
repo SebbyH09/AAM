@@ -208,9 +208,9 @@ export interface ServiceReport {
   maintenance_plan_id: string | null
   asset_id: string | null
   report_date: string
-  technician: string
+  technician: string | null
   type: string
-  summary: string
+  summary: string | null
   findings: string | null
   recommendations: string | null
   parts_used: string | null
