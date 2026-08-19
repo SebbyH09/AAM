@@ -10,9 +10,9 @@ import { FileText, Clock, DollarSign, User, Wrench, ClipboardList } from 'lucide
 interface ServiceReport {
   id: string
   report_date: string
-  technician: string
+  technician: string | null
   type: string
-  summary: string
+  summary: string | null
   findings: string | null
   recommendations: string | null
   parts_used: string | null
@@ -72,7 +72,7 @@ export default function ServiceReportDetailModal({ report, onClose }: ServiceRep
               <User className="h-3 w-3" />
               Technician
             </div>
-            <p className="text-sm text-gray-700">{report.technician}</p>
+            <p className="text-sm text-gray-700">{report.technician || '—'}</p>
           </div>
           {report.labor_hours != null && (
             <div>
@@ -95,10 +95,12 @@ export default function ServiceReportDetailModal({ report, onClose }: ServiceRep
         </div>
 
         {/* Summary */}
-        <div>
-          <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Summary</h4>
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">{report.summary}</p>
-        </div>
+        {report.summary && (
+          <div>
+            <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Summary</h4>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{report.summary}</p>
+          </div>
+        )}
 
         {/* Findings */}
         {report.findings && (

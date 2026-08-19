@@ -56,9 +56,9 @@ function isRecentlyRenewed(contract: Contract): boolean {
 interface ServiceReport {
   id: string
   report_date: string
-  technician: string
+  technician: string | null
   type: string
-  summary: string
+  summary: string | null
   findings: string | null
   recommendations: string | null
   parts_used: string | null
@@ -433,9 +433,9 @@ export default function ContractDetailModal({ contract: initialContract, onClose
                       {reports.map((r) => (
                         <tr key={r.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedReport(r)}>
                           <td className="px-4 py-2 text-sm text-gray-700">{formatDate(r.report_date)}</td>
-                          <td className="px-4 py-2 text-sm text-gray-700">{r.technician}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{r.technician || '—'}</td>
                           <td className="px-4 py-2 text-sm text-gray-600 capitalize">{r.type.replace(/_/g, ' ')}</td>
-                          <td className="px-4 py-2 text-sm text-gray-700 max-w-[200px] truncate">{r.summary}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700 max-w-[200px] truncate">{r.summary || r.file_name || '—'}</td>
                           <td className="px-4 py-2">
                             <Badge className={
                               r.status === 'completed' ? 'bg-green-100 text-green-800' :

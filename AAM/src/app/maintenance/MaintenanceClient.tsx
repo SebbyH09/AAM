@@ -78,7 +78,7 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
     setLoadingReports(true)
     const { data } = await supabase
       .from('service_reports')
-      .select('id, report_date, technician, type, summary, findings, cost, status')
+      .select('id, report_date, technician, type, summary, findings, cost, status, file_name')
       .eq('maintenance_plan_id', planId)
       .order('report_date', { ascending: false })
     setPlanReports(data ?? [])
@@ -615,8 +615,8 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                         {planReports.map((r: any) => (
                           <tr key={r.id} className="hover:bg-gray-50">
                             <td className="px-4 py-2 text-sm text-gray-700">{formatDate(r.report_date)}</td>
-                            <td className="px-4 py-2 text-sm text-gray-700">{r.technician}</td>
-                            <td className="px-4 py-2 text-sm text-gray-700 max-w-[200px] truncate">{r.summary}</td>
+                            <td className="px-4 py-2 text-sm text-gray-700">{r.technician || '—'}</td>
+                            <td className="px-4 py-2 text-sm text-gray-700 max-w-[200px] truncate">{r.summary || r.file_name || '—'}</td>
                             <td className="px-4 py-2">
                               <Badge className={
                                 r.status === 'completed' ? 'bg-green-100 text-green-800' :
