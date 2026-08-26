@@ -139,6 +139,28 @@ create table repairs (
   updated_at timestamptz default now()
 );
 
+-- One-off maintenance / work orders (may or may not be attached to an asset)
+create table work_orders (
+  id uuid primary key default uuid_generate_v4(),
+  asset_id uuid references assets(id) on delete set null,
+  work_order_number text,
+  title text not null,
+  description text,
+  category text not null default 'maintenance' check (category in ('maintenance', 'repair', 'inspection', 'installation', 'cleaning', 'calibration', 'other')),
+  priority text not null default 'medium' check (priority in ('low', 'medium', 'high', 'critical')),
+  status text not null default 'open' check (status in ('open', 'in_progress', 'on_hold', 'completed', 'cancelled')),
+  requested_by text,
+  request_date date not null default current_date,
+  assigned_to text,
+  vendor text,
+  scheduled_date date,
+  completed_date date,
+  cost numeric(12,2),
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 -- Downtime events
 create table downtime_events (
   id uuid primary key default uuid_generate_v4(),
@@ -186,6 +208,8 @@ create index idx_maintenance_plans_next_due on maintenance_plans(next_due_date);
 create index idx_maintenance_records_asset_id on maintenance_records(asset_id);
 create index idx_repairs_asset_id on repairs(asset_id);
 create index idx_repairs_status on repairs(status);
+create index idx_work_orders_asset_id on work_orders(asset_id);
+create index idx_work_orders_status on work_orders(status);
 create index idx_downtime_asset_id on downtime_events(asset_id);
 
 -- Updated at trigger
@@ -205,6 +229,8 @@ create trigger maintenance_plans_updated_at before update on maintenance_plans
   for each row execute function update_updated_at();
 create trigger repairs_updated_at before update on repairs
   for each row execute function update_updated_at();
+create trigger work_orders_updated_at before update on work_orders
+  for each row execute function update_updated_at();
 
 -- Storage bucket for contracts
 insert into storage.buckets (id, name, public) values ('contracts', 'contracts', false);
@@ -215,6 +241,7 @@ alter table service_contracts enable row level security;
 alter table maintenance_plans enable row level security;
 alter table maintenance_records enable row level security;
 alter table repairs enable row level security;
+alter table work_orders enable row level security;
 alter table downtime_events enable row level security;
 alter table notification_rules enable row level security;
 alter table notification_log enable row level security;
@@ -225,6 +252,7 @@ create policy "Allow all for authenticated" on service_contracts for all using (
 create policy "Allow all for authenticated" on maintenance_plans for all using (true);
 create policy "Allow all for authenticated" on maintenance_records for all using (true);
 create policy "Allow all for authenticated" on repairs for all using (true);
+create policy "Allow all for authenticated" on work_orders for all using (true);
 create policy "Allow all for authenticated" on downtime_events for all using (true);
 create policy "Allow all for authenticated" on notification_rules for all using (true);
 create policy "Allow all for authenticated" on notification_log for all using (true);

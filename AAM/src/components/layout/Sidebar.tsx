@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -19,16 +20,34 @@ import {
   Package2,
   DollarSign,
   BarChart3,
+  ChevronDown,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
-const assetNavigation = [
+interface NavItem {
+  name: string
+  href: string
+  icon: React.ElementType
+  adminOnly: boolean
+  children?: { name: string; href: string; adminOnly: boolean }[]
+}
+
+const assetNavigation: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, adminOnly: false },
   { name: 'Assets', href: '/assets', icon: Package, adminOnly: false },
   { name: 'Service Contracts', href: '/contracts', icon: FileText, adminOnly: true },
-  { name: 'Maintenance Plans', href: '/maintenance', icon: ClipboardList, adminOnly: false },
+  {
+    name: 'Maintenance',
+    href: '/maintenance',
+    icon: ClipboardList,
+    adminOnly: false,
+    children: [
+      { name: 'Maintenance Plans', href: '/maintenance', adminOnly: false },
+      { name: 'Other Work Orders', href: '/work-orders', adminOnly: false },
+    ],
+  },
   { name: 'Repairs', href: '/repairs', icon: Wrench, adminOnly: false },
   { name: 'Downtime', href: '/downtime', icon: Clock, adminOnly: false },
   { name: 'Notifications', href: '/notifications', icon: Bell, adminOnly: false },
@@ -58,6 +77,7 @@ export default function Sidebar({ onClose, userRole }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const isAdmin = userRole === 'admin'
+  const [openMenus, setOpenMenus] = useState<Set<string>>(new Set())
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -66,8 +86,63 @@ export default function Sidebar({ onClose, userRole }: SidebarProps) {
     router.refresh()
   }
 
-  function renderNavItem(item: { name: string; href: string; icon: React.ElementType; adminOnly: boolean }) {
+  function toggleMenu(name: string) {
+    setOpenMenus((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
+  function renderNavItem(item: NavItem) {
     if (item.adminOnly && !isAdmin) return null
+
+    if (item.children) {
+      const children = item.children.filter((c) => !c.adminOnly || isAdmin)
+      const isChildActive = children.some((c) => pathname === c.href || pathname.startsWith(`${c.href}/`))
+      const isOpen = openMenus.has(item.name) || isChildActive
+      return (
+        <div key={item.name}>
+          <button
+            onClick={() => toggleMenu(item.name)}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+              isChildActive
+                ? 'bg-slate-800 text-white'
+                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+            )}
+          >
+            <item.icon className="h-5 w-5 flex-shrink-0" />
+            <span className="flex-1 text-left">{item.name}</span>
+            <ChevronDown className={cn('h-4 w-4 flex-shrink-0 transition-transform', isOpen && 'rotate-180')} />
+          </button>
+          {isOpen && (
+            <div className="mt-1 space-y-1 pl-4">
+              {children.map((child) => {
+                const isActive = pathname === child.href || pathname.startsWith(`${child.href}/`)
+                return (
+                  <Link
+                    key={child.name}
+                    href={child.href}
+                    onClick={onClose}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    )}
+                  >
+                    {child.name}
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )
+    }
+
     const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
     return (
       <Link

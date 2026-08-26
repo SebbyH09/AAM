@@ -44,6 +44,11 @@ export interface Database {
         Insert: Omit<Repair, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<Repair, 'id' | 'created_at' | 'updated_at'>>
       }
+      work_orders: {
+        Row: WorkOrder
+        Insert: Omit<WorkOrder, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<WorkOrder, 'id' | 'created_at' | 'updated_at'>>
+      }
       downtime_events: {
         Row: DowntimeEvent
         Insert: Omit<DowntimeEvent, 'id' | 'created_at'>
@@ -197,6 +202,27 @@ export interface Repair {
   labor_cost: number | null
   total_cost: number | null
   warranty_repair: boolean
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkOrder {
+  id: string
+  asset_id: string | null
+  work_order_number: string | null
+  title: string
+  description: string | null
+  category: 'maintenance' | 'repair' | 'inspection' | 'installation' | 'cleaning' | 'calibration' | 'other'
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  status: 'open' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled'
+  requested_by: string | null
+  request_date: string
+  assigned_to: string | null
+  vendor: string | null
+  scheduled_date: string | null
+  completed_date: string | null
+  cost: number | null
   notes: string | null
   created_at: string
   updated_at: string
