@@ -135,6 +135,20 @@ export default function RecordAttachments({
     }
   }
 
+  // The service-reports bucket is private, so a stored public URL won't open.
+  // Mint a short-lived signed URL on click, matching the service report modals.
+  async function openFile(a: Attachment) {
+    if (!a.file_path) return
+    const { data, error: signError } = await supabase.storage
+      .from('service-reports')
+      .createSignedUrl(a.file_path, 60)
+    if (signError || !data) {
+      setError(`Could not open "${a.file_name ?? 'file'}": ${signError?.message ?? 'unknown error'}`)
+      return
+    }
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+  }
+
   async function handleDelete(a: Attachment) {
     if (!confirm(`Remove "${a.file_name ?? a.summary ?? 'this attachment'}"?`)) return
     if (a.file_path) {
@@ -216,9 +230,19 @@ export default function RecordAttachments({
                 <div className="flex min-w-0 items-start gap-3">
                   <FileText className="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-gray-900">
-                      {a.file_name ?? a.summary ?? 'Attachment'}
-                    </p>
+                    {a.file_path ? (
+                      <button
+                        onClick={() => openFile(a)}
+                        className="truncate text-left text-sm font-medium text-blue-600 hover:underline"
+                        title="Open / view"
+                      >
+                        {a.file_name ?? a.summary ?? 'Attachment'}
+                      </button>
+                    ) : (
+                      <p className="truncate text-sm font-medium text-gray-900">
+                        {a.file_name ?? a.summary ?? 'Attachment'}
+                      </p>
+                    )}
                     <p className="mt-0.5 text-xs text-gray-500">
                       {a.technician ? `${a.technician} • ` : ''}
                       {formatDate(a.report_date ?? a.created_at)}
@@ -227,16 +251,14 @@ export default function RecordAttachments({
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {a.file_url && (
-                    <a
-                      href={a.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                  {a.file_path && (
+                    <button
+                      onClick={() => openFile(a)}
                       className="text-gray-400 hover:text-blue-600"
                       title="Open / download"
                     >
                       <Download className="h-4 w-4" />
-                    </a>
+                    </button>
                   )}
                   <button
                     onClick={() => handleDelete(a)}
