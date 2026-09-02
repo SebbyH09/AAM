@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Input, Select } from '@/components/ui/Input'
 import { formatDate, formatCurrency, statusColor } from '@/lib/utils'
 import { Search, Filter, ChevronDown, ChevronUp, Clock, DollarSign, Wrench, User } from 'lucide-react'
+import RecordAttachments from '@/components/RecordAttachments'
 
 interface MaintenanceRecord {
   id: string
@@ -233,6 +234,15 @@ export default function MaintenanceHistoryClient({ records, plans, assetName }: 
                       <DetailBlock label="Findings" value={record.findings} />
                       <DetailBlock label="Parts Replaced" value={record.parts_replaced} />
                       <DetailBlock label="Notes" value={record.notes} />
+                    </div>
+
+                    <div className="mt-4 border-t border-gray-200 pt-4">
+                      <RecordAttachments
+                        maintenanceRecordId={record.id}
+                        assetId={record.asset_id}
+                        title="Attachments"
+                        bare
+                      />
                     </div>
                   </div>
                 )}

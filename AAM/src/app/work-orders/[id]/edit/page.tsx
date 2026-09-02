@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Header from '@/components/layout/Header'
 import WorkOrderForm from '../../WorkOrderForm'
+import RecordAttachments from '@/components/RecordAttachments'
 import { notFound } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -23,8 +24,9 @@ export default async function EditWorkOrderPage({ params }: PageProps) {
   return (
     <div>
       <Header title="Edit Work Order" subtitle={workOrder.title} />
-      <div className="p-6">
+      <div className="p-6 space-y-6">
         <WorkOrderForm assets={assets ?? []} workOrder={workOrder} />
+        <RecordAttachments workOrderId={id} assetId={workOrder.asset_id} />
       </div>
     </div>
   )
