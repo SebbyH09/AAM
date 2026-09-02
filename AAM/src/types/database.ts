@@ -233,6 +233,8 @@ export interface ServiceReport {
   service_contract_id: string | null
   maintenance_plan_id: string | null
   asset_id: string | null
+  repair_id: string | null
+  work_order_id: string | null
   report_date: string
   technician: string | null
   type: string
