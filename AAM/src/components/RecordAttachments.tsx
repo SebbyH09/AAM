@@ -22,10 +22,14 @@ interface RecordAttachmentsProps {
   repairId?: string
   /** Attach against a work order. */
   workOrderId?: string
+  /** Attach against an individual maintenance history record. */
+  maintenanceRecordId?: string
   /** Optional asset the record belongs to, so the file also surfaces at asset level. */
   assetId?: string | null
   /** Section heading. Defaults to "Attachments". */
   title?: string
+  /** Render as a plain block (no card border/shadow) — for use inside another panel. */
+  bare?: boolean
 }
 
 // Generous cap — service reports can be scanned multi-page PDFs.
@@ -39,8 +43,10 @@ function stripExtension(name: string): string {
 export default function RecordAttachments({
   repairId,
   workOrderId,
+  maintenanceRecordId,
   assetId,
   title = 'Attachments',
+  bare = false,
 }: RecordAttachmentsProps) {
   const supabase = createClient()
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -50,8 +56,12 @@ export default function RecordAttachments({
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Which foreign key on service_reports this section writes to.
-  const linkColumn = repairId ? 'repair_id' : 'work_order_id'
-  const linkValue = repairId ?? workOrderId ?? null
+  const linkColumn = repairId
+    ? 'repair_id'
+    : workOrderId
+      ? 'work_order_id'
+      : 'maintenance_record_id'
+  const linkValue = repairId ?? workOrderId ?? maintenanceRecordId ?? null
 
   async function loadAttachments() {
     if (!linkValue) return
@@ -142,16 +152,24 @@ export default function RecordAttachments({
   }
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center gap-2 border-b border-gray-200 px-6 py-4">
-        <Paperclip className="h-5 w-5 text-indigo-600" />
-        <h2 className="font-semibold text-gray-900">{title}</h2>
+    <section className={bare ? '' : 'rounded-xl border border-gray-200 bg-white shadow-sm'}>
+      <div
+        className={
+          bare
+            ? 'flex items-center gap-2 mb-3'
+            : 'flex items-center gap-2 border-b border-gray-200 px-6 py-4'
+        }
+      >
+        <Paperclip className={bare ? 'h-4 w-4 text-indigo-600' : 'h-5 w-5 text-indigo-600'} />
+        <h2 className={bare ? 'text-xs font-medium uppercase tracking-wider text-gray-500' : 'font-semibold text-gray-900'}>
+          {title}
+        </h2>
         {attachments.length > 0 && (
           <span className="text-sm text-gray-400">({attachments.length})</span>
         )}
       </div>
 
-      <div className="px-6 py-4 space-y-4">
+      <div className={bare ? 'space-y-4' : 'px-6 py-4 space-y-4'}>
         {error && (
           <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>
         )}
