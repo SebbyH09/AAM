@@ -144,6 +144,20 @@ export default function AssetDocumentsSection({ assetId }: AssetDocumentsSection
     await loadDocuments()
   }
 
+  // The asset-documents bucket is private, so a stored public URL won't open.
+  // Mint a short-lived signed URL on click instead.
+  async function openDocument(doc: AssetDocument) {
+    if (!doc.file_path) return
+    const { data, error: signError } = await supabase.storage
+      .from('asset-documents')
+      .createSignedUrl(doc.file_path, 60)
+    if (signError || !data) {
+      setError(`Could not open "${doc.file_name ?? doc.name}": ${signError?.message ?? 'unknown error'}`)
+      return
+    }
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+  }
+
   async function handleDelete(doc: AssetDocument) {
     if (!confirm(`Delete document "${doc.name}"?`)) return
 
@@ -224,20 +238,28 @@ export default function AssetDocumentsSection({ assetId }: AssetDocumentsSection
                 </p>
                 {doc.notes && <p className="text-xs text-gray-600 mt-0.5">{doc.notes}</p>}
                 {doc.file_name && (
-                  <p className="text-xs text-gray-400 mt-0.5">📎 {doc.file_name}</p>
+                  doc.file_path ? (
+                    <button
+                      onClick={() => openDocument(doc)}
+                      className="text-xs text-blue-600 hover:underline mt-0.5 inline-block text-left"
+                      title="Open / view"
+                    >
+                      📎 {doc.file_name}
+                    </button>
+                  ) : (
+                    <p className="text-xs text-gray-400 mt-0.5">📎 {doc.file_name}</p>
+                  )
                 )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {doc.file_url && (
-                  <a
-                    href={doc.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                {doc.file_path && (
+                  <button
+                    onClick={() => openDocument(doc)}
                     className="text-gray-400 hover:text-blue-600"
                     title="Download"
                   >
                     <Download className="h-4 w-4" />
-                  </a>
+                  </button>
                 )}
                 <button
                   onClick={() => handleDelete(doc)}
