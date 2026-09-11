@@ -5,16 +5,11 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
+import { AssetPicker, PickerAsset } from '@/components/AssetPicker'
 import { Button } from '@/components/ui/Button'
 
-interface Asset {
-  id: string
-  name: string
-  asset_tag: string | null
-}
-
 interface LogDowntimeModalProps {
-  assets: Asset[]
+  assets: PickerAsset[]
   onClose: () => void
 }
 
@@ -34,11 +29,6 @@ export default function LogDowntimeModal({ assets, onClose }: LogDowntimeModalPr
   const [error, setError] = useState('')
 
   const now = new Date().toISOString().slice(0, 16)
-
-  const assetOptions = [
-    { value: '', label: 'Select asset...' },
-    ...assets.map((a) => ({ value: a.id, label: `${a.name}${a.asset_tag ? ` (${a.asset_tag})` : ''}` })),
-  ]
 
   const [form, setForm] = useState({
     asset_id: '',
@@ -102,7 +92,14 @@ export default function LogDowntimeModal({ assets, onClose }: LogDowntimeModalPr
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <Select label="Asset *" value={form.asset_id} onChange={set('asset_id')} options={assetOptions} />
+            <AssetPicker
+              label="Asset *"
+              assets={assets}
+              value={form.asset_id}
+              onChange={(assetId) => setForm((prev) => ({ ...prev, asset_id: assetId }))}
+              placeholder="Search for the asset that went down..."
+              modalTitle="Link an asset to this downtime event"
+            />
           </div>
           <Select label="Reason" value={form.reason} onChange={set('reason')} options={REASON_OPTIONS} />
           <Input label="Cost Impact ($)" type="number" value={form.cost_impact} onChange={set('cost_impact')} placeholder="0.00" step="0.01" min="0" />

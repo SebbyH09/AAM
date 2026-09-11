@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Header from '@/components/layout/Header'
 import MaintenancePlanForm from '../MaintenancePlanForm'
+import { ASSET_PICKER_COLUMNS } from '@/components/AssetPicker'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +12,7 @@ interface PageProps {
 export default async function NewMaintenancePlanPage({ searchParams }: PageProps) {
   const { asset_id } = await searchParams
   const supabase = await createClient()
-  const { data: assets } = await supabase.from('assets').select('id, name, asset_tag, location').order('name')
+  const { data: assets } = await supabase.from('assets').select(ASSET_PICKER_COLUMNS).order('name')
 
   return (
     <div>

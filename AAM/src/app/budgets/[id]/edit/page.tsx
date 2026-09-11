@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Header from '@/components/layout/Header'
 import BudgetForm from '../../BudgetForm'
 import { notFound } from 'next/navigation'
+import { ASSET_PICKER_COLUMNS } from '@/components/AssetPicker'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +16,7 @@ export default async function EditBudgetPage({ params }: PageProps) {
 
   const [{ data: budget }, { data: assets }] = await Promise.all([
     supabase.from('budgets').select('*').eq('id', id).single(),
-    supabase.from('assets').select('id, name, asset_tag').order('name'),
+    supabase.from('assets').select(ASSET_PICKER_COLUMNS).order('name'),
   ])
 
   if (!budget) notFound()

@@ -4,17 +4,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
+import { AssetPicker, PickerAsset } from '@/components/AssetPicker'
 import { Button } from '@/components/ui/Button'
 import { WorkOrder } from '@/types/database'
 
-interface Asset {
-  id: string
-  name: string
-  asset_tag: string | null
-}
-
 interface WorkOrderFormProps {
-  assets: Asset[]
+  assets: PickerAsset[]
   workOrder?: WorkOrder
   defaultAssetId?: string
 }
@@ -49,11 +44,6 @@ export default function WorkOrderForm({ assets, workOrder, defaultAssetId }: Wor
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
-  const assetOptions = [
-    { value: '', label: 'No asset (general work order)' },
-    ...assets.map((a) => ({ value: a.id, label: `${a.name}${a.asset_tag ? ` (${a.asset_tag})` : ''}` })),
-  ]
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -135,7 +125,14 @@ export default function WorkOrderForm({ assets, workOrder, defaultAssetId }: Wor
             <Input label="Title *" value={form.title} onChange={set('title')} placeholder="e.g. Replace HVAC filter in lab" />
           </div>
           <div className="sm:col-span-2">
-            <Select label="Asset (optional)" value={form.asset_id} onChange={set('asset_id')} options={assetOptions} />
+            <AssetPicker
+              label="Asset (optional)"
+              assets={assets}
+              value={form.asset_id}
+              onChange={(assetId) => setForm((prev) => ({ ...prev, asset_id: assetId }))}
+              placeholder="No asset (general work order)"
+              modalTitle="Link an asset to this work order"
+            />
           </div>
           <Input label="Work Order Number" value={form.work_order_number} onChange={set('work_order_number')} placeholder="e.g. WO-2024-001" />
           <Select label="Category" value={form.category} onChange={set('category')} options={CATEGORY_OPTIONS} />

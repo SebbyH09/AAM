@@ -4,19 +4,13 @@ import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
+import { AssetPicker, PickerAsset } from '@/components/AssetPicker'
 import { Button } from '@/components/ui/Button'
 import { MaintenancePlan } from '@/types/database'
 import { MapPin, Plus, Trash2 } from 'lucide-react'
 
-interface Asset {
-  id: string
-  name: string
-  asset_tag: string | null
-  location: string | null
-}
-
 interface MaintenancePlanFormProps {
-  assets: Asset[]
+  assets: PickerAsset[]
   plan?: MaintenancePlan
   defaultAssetId?: string
 }
@@ -43,11 +37,6 @@ export default function MaintenancePlanForm({ assets, plan, defaultAssetId }: Ma
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
-  const assetOptions = [
-    { value: '', label: 'No asset' },
-    ...assets.map((a) => ({ value: a.id, label: `${a.name}${a.asset_tag ? ` (${a.asset_tag})` : ''}` })),
-  ]
 
   const [form, setForm] = useState({
     asset_id: plan?.asset_id ?? defaultAssetId ?? '',
@@ -130,7 +119,14 @@ export default function MaintenancePlanForm({ assets, plan, defaultAssetId }: Ma
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <Select label="Asset" value={form.asset_id} onChange={set('asset_id')} options={assetOptions} />
+            <AssetPicker
+              label="Asset"
+              assets={assets}
+              value={form.asset_id}
+              onChange={(assetId) => setForm((prev) => ({ ...prev, asset_id: assetId }))}
+              placeholder="No asset"
+              modalTitle="Link an asset to this maintenance plan"
+            />
           </div>
           {selectedAsset && (
             <div className="sm:col-span-2">

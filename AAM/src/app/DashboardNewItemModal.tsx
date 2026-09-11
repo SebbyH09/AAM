@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Plus, CheckCircle2 } from 'lucide-react'
+import { ASSET_PICKER_COLUMNS, AssetPicker, PickerAsset } from '@/components/AssetPicker'
 
 type ItemType =
   | ''
@@ -18,12 +19,6 @@ type ItemType =
   | 'vendor'
   | 'calibration'
   | 'budget'
-
-interface SimpleAsset {
-  id: string
-  name: string
-  asset_tag: string | null
-}
 
 // ---- Select option constants ----
 
@@ -178,7 +173,7 @@ export default function DashboardNewItemModal() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const [assets, setAssets] = useState<SimpleAsset[]>([])
+  const [assets, setAssets] = useState<PickerAsset[]>([])
 
   // form states per type
   const [assetForm, setAssetForm] = useState(defaultAssetForm())
@@ -192,7 +187,7 @@ export default function DashboardNewItemModal() {
 
   useEffect(() => {
     if (open) {
-      supabase.from('assets').select('id, name, asset_tag').order('name').then(({ data }) => {
+      supabase.from('assets').select(ASSET_PICKER_COLUMNS).order('name').then(({ data }) => {
         if (data) setAssets(data)
       })
     }
@@ -254,16 +249,6 @@ export default function DashboardNewItemModal() {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setBudgetForm((p) => ({ ...p, [field]: e.target.value }))
   }
-
-  const assetOptions = [
-    { value: '', label: 'No asset' },
-    ...assets.map((a) => ({ value: a.id, label: `${a.name}${a.asset_tag ? ` (${a.asset_tag})` : ''}` })),
-  ]
-
-  const assetOptionsRequired = [
-    { value: '', label: 'Select asset...' },
-    ...assets.map((a) => ({ value: a.id, label: `${a.name}${a.asset_tag ? ` (${a.asset_tag})` : ''}` })),
-  ]
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -518,7 +503,14 @@ export default function DashboardNewItemModal() {
             {itemType === 'service_contract' && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 border-t border-gray-100 pt-4">
                 <div className="sm:col-span-2">
-                  <Select label="Linked Asset" value={contractForm.asset_id} onChange={setC('asset_id')} options={assetOptions} />
+                  <AssetPicker
+                    label="Linked Asset"
+                    assets={assets}
+                    value={contractForm.asset_id}
+                    onChange={(assetId) => setContractForm((p) => ({ ...p, asset_id: assetId }))}
+                    placeholder="No asset"
+                    modalTitle="Link an asset to this contract"
+                  />
                 </div>
                 <Input label="Vendor Name *" value={contractForm.vendor_name} onChange={setC('vendor_name')} placeholder="e.g. Agilent Technologies" />
                 <Input label="Contract Number" value={contractForm.contract_number} onChange={setC('contract_number')} placeholder="e.g. SVC-2024-001" />
@@ -545,7 +537,14 @@ export default function DashboardNewItemModal() {
             {itemType === 'maintenance_plan' && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 border-t border-gray-100 pt-4">
                 <div className="sm:col-span-2">
-                  <Select label="Asset" value={maintenanceForm.asset_id} onChange={setM('asset_id')} options={assetOptions} />
+                  <AssetPicker
+                    label="Asset"
+                    assets={assets}
+                    value={maintenanceForm.asset_id}
+                    onChange={(assetId) => setMaintenanceForm((p) => ({ ...p, asset_id: assetId }))}
+                    placeholder="No asset"
+                    modalTitle="Link an asset to this maintenance plan"
+                  />
                 </div>
                 <div className="sm:col-span-2">
                   <Input label="Plan Name *" value={maintenanceForm.name} onChange={setM('name')} placeholder="e.g. Monthly Filter Replacement" />
@@ -566,7 +565,14 @@ export default function DashboardNewItemModal() {
             {itemType === 'repair' && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 border-t border-gray-100 pt-4">
                 <div className="sm:col-span-2">
-                  <Select label="Asset" value={repairForm.asset_id} onChange={setR('asset_id')} options={assetOptions} />
+                  <AssetPicker
+                    label="Asset"
+                    assets={assets}
+                    value={repairForm.asset_id}
+                    onChange={(assetId) => setRepairForm((p) => ({ ...p, asset_id: assetId }))}
+                    placeholder="No asset"
+                    modalTitle="Link an asset to this repair"
+                  />
                 </div>
                 <Input label="Repair Number" value={repairForm.repair_number} onChange={setR('repair_number')} placeholder="e.g. REP-2024-001" />
                 <Input label="Reported By *" value={repairForm.reported_by} onChange={setR('reported_by')} placeholder="Name" />
@@ -631,7 +637,14 @@ export default function DashboardNewItemModal() {
             {itemType === 'calibration' && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 border-t border-gray-100 pt-4">
                 <div className="sm:col-span-2">
-                  <Select label="Asset *" value={calibrationForm.asset_id} onChange={setK('asset_id')} options={assetOptionsRequired} />
+                  <AssetPicker
+                    label="Asset *"
+                    assets={assets}
+                    value={calibrationForm.asset_id}
+                    onChange={(assetId) => setCalibrationForm((p) => ({ ...p, asset_id: assetId }))}
+                    placeholder="Search for the calibrated asset..."
+                    modalTitle="Link an asset to this calibration"
+                  />
                 </div>
                 <Input label="Calibration Date *" type="date" value={calibrationForm.calibration_date} onChange={setK('calibration_date')} />
                 <Input label="Next Due Date *" type="date" value={calibrationForm.next_due_date} onChange={setK('next_due_date')} />
@@ -656,7 +669,14 @@ export default function DashboardNewItemModal() {
                 <Input label="Planned Amount ($) *" type="number" value={budgetForm.planned_amount} onChange={setB('planned_amount')} placeholder="0.00" step="0.01" min="0" />
                 <Input label="Department" value={budgetForm.department} onChange={setB('department')} placeholder="e.g. Facilities" />
                 <div className="sm:col-span-2">
-                  <Select label="Linked Asset (optional)" value={budgetForm.asset_id} onChange={setB('asset_id')} options={assetOptions} />
+                  <AssetPicker
+                    label="Linked Asset (optional)"
+                    assets={assets}
+                    value={budgetForm.asset_id}
+                    onChange={(assetId) => setBudgetForm((p) => ({ ...p, asset_id: assetId }))}
+                    placeholder="No specific asset"
+                    modalTitle="Link an asset to this budget"
+                  />
                 </div>
                 <div className="sm:col-span-2">
                   <Textarea label="Notes" value={budgetForm.notes} onChange={setB('notes')} placeholder="Additional notes..." rows={2} />

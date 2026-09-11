@@ -1,21 +1,16 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { ServiceContract } from '@/types/database'
-import { Upload, X, Search, Check } from 'lucide-react'
-
-interface Asset {
-  id: string
-  name: string
-  asset_tag: string | null
-}
+import { AssetMultiPicker, PickerAsset } from '@/components/AssetPicker'
+import { Upload, X } from 'lucide-react'
 
 interface ContractFormProps {
-  assets: Asset[]
+  assets: PickerAsset[]
   contract?: ServiceContract
   defaultAssetIds?: string[]
   existingItems?: { id: string; description: string; quantity: number; unit_cost: number | null; notes: string | null }[]
@@ -43,34 +38,6 @@ export default function ContractForm({ assets, contract, defaultAssetIds }: Cont
   const [uploadProgress, setUploadProgress] = useState(false)
 
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>(defaultAssetIds ?? [])
-  const [assetSearch, setAssetSearch] = useState('')
-  const [assetDropdownOpen, setAssetDropdownOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setAssetDropdownOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const filteredAssets = assets.filter((a) => {
-    const q = assetSearch.toLowerCase()
-    return !q || a.name.toLowerCase().includes(q) || (a.asset_tag?.toLowerCase().includes(q) ?? false)
-  })
-
-  function toggleAsset(assetId: string) {
-    setSelectedAssetIds((prev) =>
-      prev.includes(assetId) ? prev.filter((id) => id !== assetId) : [...prev, assetId]
-    )
-  }
-
-  function removeAsset(assetId: string) {
-    setSelectedAssetIds((prev) => prev.filter((id) => id !== assetId))
-  }
 
   const [form, setForm] = useState({
     contract_number: contract?.contract_number ?? '',
@@ -186,8 +153,6 @@ export default function ContractForm({ assets, contract, defaultAssetIds }: Cont
     router.refresh()
   }
 
-  const selectedAssets = assets.filter((a) => selectedAssetIds.includes(a.id))
-
   return (
     <div className="max-w-2xl">
       <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-6">
@@ -198,80 +163,13 @@ export default function ContractForm({ assets, contract, defaultAssetIds }: Cont
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* Multi-Asset Selector */}
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Linked Assets</label>
-
-            {/* Selected assets tags */}
-            {selectedAssets.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-2">
-                {selectedAssets.map((asset) => (
-                  <span
-                    key={asset.id}
-                    className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-700"
-                  >
-                    {asset.name}{asset.asset_tag ? ` (${asset.asset_tag})` : ''}
-                    <button
-                      type="button"
-                      onClick={() => removeAsset(asset.id)}
-                      className="ml-1 rounded-full p-0.5 hover:bg-blue-200 text-blue-500 hover:text-blue-700"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Dropdown trigger / search */}
-            <div ref={dropdownRef} className="relative">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search and select assets..."
-                  value={assetSearch}
-                  onChange={(e) => { setAssetSearch(e.target.value); setAssetDropdownOpen(true) }}
-                  onFocus={() => setAssetDropdownOpen(true)}
-                  className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              {assetDropdownOpen && (
-                <div className="absolute z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                  {filteredAssets.length === 0 ? (
-                    <p className="px-4 py-3 text-sm text-gray-500">No assets found</p>
-                  ) : (
-                    filteredAssets.map((asset) => {
-                      const isSelected = selectedAssetIds.includes(asset.id)
-                      return (
-                        <button
-                          key={asset.id}
-                          type="button"
-                          onClick={() => toggleAsset(asset.id)}
-                          className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm transition-colors ${
-                            isSelected ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                            isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
-                          }`}>
-                            {isSelected && <Check className="h-3 w-3 text-white" />}
-                          </div>
-                          <span>
-                            {asset.name}
-                            {asset.asset_tag && <span className="text-gray-400 ml-1">({asset.asset_tag})</span>}
-                          </span>
-                        </button>
-                      )
-                    })
-                  )}
-                </div>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-gray-500">
-              {selectedAssetIds.length === 0
-                ? 'No assets linked. Search above to add assets.'
-                : `${selectedAssetIds.length} asset${selectedAssetIds.length !== 1 ? 's' : ''} selected`}
-            </p>
+            <AssetMultiPicker
+              label="Linked Assets"
+              assets={assets}
+              values={selectedAssetIds}
+              onChange={setSelectedAssetIds}
+              modalTitle="Link assets to this contract"
+            />
           </div>
 
           <Input label="Vendor Name *" value={form.vendor_name} onChange={set('vendor_name')} placeholder="e.g. Agilent Technologies" />

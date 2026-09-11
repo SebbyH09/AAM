@@ -4,6 +4,7 @@ import RepairForm from '../../RepairForm'
 import LaborLogSection from '../../LaborLogSection'
 import RecordAttachments from '@/components/RecordAttachments'
 import { notFound } from 'next/navigation'
+import { ASSET_PICKER_COLUMNS } from '@/components/AssetPicker'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,7 @@ export default async function EditRepairPage({ params }: PageProps) {
 
   const [{ data: repair }, { data: assets }] = await Promise.all([
     supabase.from('repairs').select('*').eq('id', id).single(),
-    supabase.from('assets').select('id, name, asset_tag').order('name'),
+    supabase.from('assets').select(ASSET_PICKER_COLUMNS).order('name'),
   ])
 
   if (!repair) notFound()

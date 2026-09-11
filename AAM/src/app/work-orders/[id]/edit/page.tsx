@@ -3,6 +3,7 @@ import Header from '@/components/layout/Header'
 import WorkOrderForm from '../../WorkOrderForm'
 import RecordAttachments from '@/components/RecordAttachments'
 import { notFound } from 'next/navigation'
+import { ASSET_PICKER_COLUMNS } from '@/components/AssetPicker'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,7 @@ export default async function EditWorkOrderPage({ params }: PageProps) {
 
   const [{ data: workOrder }, { data: assets }] = await Promise.all([
     supabase.from('work_orders').select('*').eq('id', id).single(),
-    supabase.from('assets').select('id, name, asset_tag').order('name'),
+    supabase.from('assets').select(ASSET_PICKER_COLUMNS).order('name'),
   ])
 
   if (!workOrder) notFound()

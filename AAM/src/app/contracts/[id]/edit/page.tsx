@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Header from '@/components/layout/Header'
 import ContractForm from '../../ContractForm'
 import { notFound } from 'next/navigation'
+import { ASSET_PICKER_COLUMNS } from '@/components/AssetPicker'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +16,7 @@ export default async function EditContractPage({ params }: PageProps) {
 
   const [{ data: contract }, { data: assets }, { data: linkedAssets }] = await Promise.all([
     supabase.from('service_contracts').select('*').eq('id', id).single(),
-    supabase.from('assets').select('id, name, asset_tag').order('name'),
+    supabase.from('assets').select(ASSET_PICKER_COLUMNS).order('name'),
     supabase.from('service_contract_assets').select('asset_id').eq('service_contract_id', id),
   ])
 
