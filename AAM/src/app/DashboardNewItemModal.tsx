@@ -7,7 +7,8 @@ import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Plus, CheckCircle2 } from 'lucide-react'
-import { ASSET_PICKER_COLUMNS, AssetPicker, PickerAsset } from '@/components/AssetPicker'
+import { AssetPicker, PickerAsset } from '@/components/AssetPicker'
+import { ASSET_PICKER_COLUMNS } from '@/lib/assetPicker'
 
 type ItemType =
   | ''
