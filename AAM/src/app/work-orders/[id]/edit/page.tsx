@@ -3,7 +3,7 @@ import Header from '@/components/layout/Header'
 import WorkOrderForm from '../../WorkOrderForm'
 import RecordAttachments from '@/components/RecordAttachments'
 import { notFound } from 'next/navigation'
-import { ASSET_PICKER_COLUMNS } from '@/components/AssetPicker'
+import { ASSET_PICKER_COLUMNS } from '@/lib/assetPicker'
 
 export const dynamic = 'force-dynamic'
 

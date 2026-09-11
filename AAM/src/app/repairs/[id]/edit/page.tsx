@@ -4,7 +4,7 @@ import RepairForm from '../../RepairForm'
 import LaborLogSection from '../../LaborLogSection'
 import RecordAttachments from '@/components/RecordAttachments'
 import { notFound } from 'next/navigation'
-import { ASSET_PICKER_COLUMNS } from '@/components/AssetPicker'
+import { ASSET_PICKER_COLUMNS } from '@/lib/assetPicker'
 
 export const dynamic = 'force-dynamic'
 

@@ -4,27 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Package, Search, X } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { cn, statusColor } from '@/lib/utils'
+import { type PickerAsset } from '@/lib/assetPicker'
 
-/**
- * Minimal shape the picker needs. Every field beyond id/name is optional so a
- * caller can pass whatever columns it selected, but the more it passes the more
- * the user can search on (model #, serial #, manufacturer, location...).
- */
-export interface PickerAsset {
-  id: string
-  name: string
-  asset_tag?: string | null
-  category?: string | null
-  manufacturer?: string | null
-  model?: string | null
-  serial_number?: string | null
-  location?: string | null
-  status?: string | null
-}
-
-/** Columns to select when loading assets for a picker. */
-export const ASSET_PICKER_COLUMNS =
-  'id, name, asset_tag, category, manufacturer, model, serial_number, location, status'
+// Re-exported so consumers of the picker can type their asset lists without a
+// second import. The constant itself stays in @/lib/assetPicker: Server
+// Components cannot read a value out of a 'use client' module.
+export type { PickerAsset }
 
 type SearchField = 'name' | 'asset_tag' | 'category' | 'manufacturer' | 'model' | 'serial_number' | 'location' | 'status'
 

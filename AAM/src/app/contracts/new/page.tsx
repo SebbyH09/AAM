@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Header from '@/components/layout/Header'
 import ContractForm from '../ContractForm'
-import { ASSET_PICKER_COLUMNS } from '@/components/AssetPicker'
+import { ASSET_PICKER_COLUMNS } from '@/lib/assetPicker'
 
 export const dynamic = 'force-dynamic'
 
