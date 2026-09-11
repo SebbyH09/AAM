@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Header from '@/components/layout/Header'
 import DowntimeClient from './DowntimeClient'
+import { ASSET_PICKER_COLUMNS } from '@/components/AssetPicker'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +13,7 @@ export default async function DowntimePage() {
       .from('downtime_events')
       .select('*, assets(name, asset_tag, serial_number, model)')
       .order('start_time', { ascending: false }),
-    supabase.from('assets').select('id, name, asset_tag').order('name'),
+    supabase.from('assets').select(ASSET_PICKER_COLUMNS).order('name'),
   ])
 
   // Compute total downtime by asset

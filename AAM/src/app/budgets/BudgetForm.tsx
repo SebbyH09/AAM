@@ -4,13 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
+import { AssetPicker, PickerAsset } from '@/components/AssetPicker'
 import { Button } from '@/components/ui/Button'
-
-interface Asset {
-  id: string
-  name: string
-  asset_tag: string | null
-}
 
 interface Budget {
   id: string
@@ -24,7 +19,7 @@ interface Budget {
 }
 
 interface BudgetFormProps {
-  assets: Asset[]
+  assets: PickerAsset[]
   budget?: Budget
 }
 
@@ -43,14 +38,6 @@ export default function BudgetForm({ assets, budget }: BudgetFormProps) {
   const [error, setError] = useState('')
 
   const currentYear = new Date().getFullYear()
-
-  const assetOptions = [
-    { value: '', label: 'No specific asset' },
-    ...assets.map((a) => ({
-      value: a.id,
-      label: `${a.name}${a.asset_tag ? ` (${a.asset_tag})` : ''}`,
-    })),
-  ]
 
   const [form, setForm] = useState({
     name: budget?.name ?? '',
@@ -115,7 +102,14 @@ export default function BudgetForm({ assets, budget }: BudgetFormProps) {
           <div className="sm:col-span-2">
             <Input label="Budget Name *" value={form.name} onChange={set('name')} placeholder="e.g. 2026 Preventive Maintenance" />
           </div>
-          <Select label="Asset (optional)" value={form.asset_id} onChange={set('asset_id')} options={assetOptions} />
+          <AssetPicker
+            label="Asset (optional)"
+            assets={assets}
+            value={form.asset_id}
+            onChange={(assetId) => setForm((prev) => ({ ...prev, asset_id: assetId }))}
+            placeholder="No specific asset"
+            modalTitle="Link an asset to this budget"
+          />
           <Input label="Department" value={form.department} onChange={set('department')} placeholder="e.g. Facilities, Production" />
           <Input
             label="Fiscal Year *"

@@ -4,17 +4,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
+import { AssetPicker, PickerAsset } from '@/components/AssetPicker'
 import { Button } from '@/components/ui/Button'
 import { Repair } from '@/types/database'
 
-interface Asset {
-  id: string
-  name: string
-  asset_tag: string | null
-}
-
 interface RepairFormProps {
-  assets: Asset[]
+  assets: PickerAsset[]
   repair?: Repair
   defaultAssetId?: string
 }
@@ -39,11 +34,6 @@ export default function RepairForm({ assets, repair, defaultAssetId }: RepairFor
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
-  const assetOptions = [
-    { value: '', label: 'No asset' },
-    ...assets.map((a) => ({ value: a.id, label: `${a.name}${a.asset_tag ? ` (${a.asset_tag})` : ''}` })),
-  ]
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -130,7 +120,14 @@ export default function RepairForm({ assets, repair, defaultAssetId }: RepairFor
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <Select label="Asset" value={form.asset_id} onChange={set('asset_id')} options={assetOptions} />
+            <AssetPicker
+              label="Asset"
+              assets={assets}
+              value={form.asset_id}
+              onChange={(assetId) => setForm((prev) => ({ ...prev, asset_id: assetId }))}
+              placeholder="No asset"
+              modalTitle="Link an asset to this repair"
+            />
           </div>
           <Input label="Repair Number" value={form.repair_number} onChange={set('repair_number')} placeholder="e.g. REP-2024-001" />
           <Input label="Reported By *" value={form.reported_by} onChange={set('reported_by')} placeholder="Name" />

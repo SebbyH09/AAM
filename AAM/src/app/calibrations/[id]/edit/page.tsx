@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Header from '@/components/layout/Header'
 import CalibrationForm from '../../CalibrationForm'
 import { notFound } from 'next/navigation'
+import { ASSET_PICKER_COLUMNS } from '@/components/AssetPicker'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +16,7 @@ export default async function EditCalibrationPage({ params }: PageProps) {
 
   const [{ data: calibration }, { data: assets }] = await Promise.all([
     supabase.from('calibration_records').select('*').eq('id', id).single(),
-    supabase.from('assets').select('id, name, asset_tag').order('name'),
+    supabase.from('assets').select(ASSET_PICKER_COLUMNS).order('name'),
   ])
 
   if (!calibration) notFound()

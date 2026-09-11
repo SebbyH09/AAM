@@ -4,13 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
+import { AssetPicker, PickerAsset } from '@/components/AssetPicker'
 import { Button } from '@/components/ui/Button'
-
-interface Asset {
-  id: string
-  name: string
-  asset_tag: string | null
-}
 
 interface CalibrationRecord {
   id: string
@@ -28,7 +23,7 @@ interface CalibrationRecord {
 }
 
 interface CalibrationFormProps {
-  assets: Asset[]
+  assets: PickerAsset[]
   calibration?: CalibrationRecord
 }
 
@@ -46,14 +41,6 @@ export default function CalibrationForm({ assets, calibration }: CalibrationForm
   const [error, setError] = useState('')
 
   const today = new Date().toISOString().split('T')[0]
-
-  const assetOptions = [
-    { value: '', label: 'Select asset' },
-    ...assets.map((a) => ({
-      value: a.id,
-      label: `${a.name}${a.asset_tag ? ` (${a.asset_tag})` : ''}`,
-    })),
-  ]
 
   const [form, setForm] = useState({
     asset_id: calibration?.asset_id ?? '',
@@ -124,7 +111,14 @@ export default function CalibrationForm({ assets, calibration }: CalibrationForm
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <Select label="Asset *" value={form.asset_id} onChange={set('asset_id')} options={assetOptions} />
+            <AssetPicker
+              label="Asset *"
+              assets={assets}
+              value={form.asset_id}
+              onChange={(assetId) => setForm((prev) => ({ ...prev, asset_id: assetId }))}
+              placeholder="Search for the calibrated asset..."
+              modalTitle="Link an asset to this calibration"
+            />
           </div>
           <Input label="Calibration Date *" type="date" value={form.calibration_date} onChange={set('calibration_date')} />
           <Input label="Next Due Date *" type="date" value={form.next_due_date} onChange={set('next_due_date')} />
