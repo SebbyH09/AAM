@@ -150,7 +150,7 @@ export interface MaintenancePlan {
   asset_id: string | null
   name: string
   description: string | null
-  frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'semi_annual' | 'annual' | 'custom'
+  frequency: 'one_time' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'semi_annual' | 'annual' | 'custom'
   frequency_days: number | null
   last_performed_date: string | null
   next_due_date: string

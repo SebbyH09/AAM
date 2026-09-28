@@ -105,6 +105,7 @@ export default function DashboardMaintenanceSections() {
       quarterly: 'Quarterly',
       semi_annual: 'Semi-Annual',
       annual: 'Annual',
+      one_time: 'One-Time',
     }
     if (freq === 'custom' && freqDays) return `Every ${freqDays}d`
     return labels[freq] ?? freq

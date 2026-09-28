@@ -4,10 +4,11 @@ import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge } from '@/lib/utils'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Edit, Plus, FileText, Wrench, ClipboardList, Clock, Zap, Ruler, Wifi, Droplets, Wind, Thermometer } from 'lucide-react'
+import { Edit, Plus, FileText, Wrench, ClipboardList, Clock, Zap, Ruler, Wifi, Droplets, Wind, Thermometer, Tag, Factory, Box, Hash } from 'lucide-react'
 import DeleteAssetButton from './DeleteAssetButton'
 import DeactivateAssetButton from './DeactivateAssetButton'
 import AssetDocumentsSection from './AssetDocumentsSection'
+import AddOneTimePmButton from './AddOneTimePmButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,7 +45,7 @@ export default async function AssetDetailPage({ params }: PageProps) {
     <div>
       <Header
         title={asset.name}
-        subtitle={[asset.manufacturer, asset.model, asset.serial_number].filter(Boolean).join(' • ')}
+        subtitle={asset.category}
         actions={
           <div className="flex gap-2">
             <Link
@@ -61,6 +62,30 @@ export default async function AssetDetailPage({ params }: PageProps) {
       />
 
       <div className="p-6 space-y-6">
+        {/* Identification */}
+        <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x">
+            {[
+              { label: 'Brand', value: asset.manufacturer, icon: Factory },
+              { label: 'Model', value: asset.model, icon: Box },
+              { label: 'Serial Number', value: asset.serial_number, icon: Hash, mono: true },
+              { label: 'Asset Tag', value: asset.asset_tag, icon: Tag, mono: true },
+            ].map(({ label, value, icon: Icon, mono }) => (
+              <div key={label} className="flex items-start gap-3 px-6 py-4">
+                <div className="rounded-lg bg-blue-50 p-2">
+                  <Icon className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</p>
+                  <p className={`mt-0.5 text-lg font-semibold break-words ${value ? 'text-gray-900' : 'text-gray-300'} ${mono && value ? 'font-mono' : ''}`}>
+                    {value || '—'}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Asset Info */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -230,17 +255,24 @@ export default async function AssetDetailPage({ params }: PageProps) {
                 <ClipboardList className="h-5 w-5 text-green-600" />
                 <h2 className="font-semibold text-gray-900">Maintenance Plans</h2>
               </div>
-              <Link
-                href={`/maintenance/new?asset_id=${id}`}
-                className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
-              >
-                <Plus className="h-4 w-4" /> Add
-              </Link>
+              <div className="flex items-center gap-4">
+                <AddOneTimePmButton assetId={id} assetName={asset.name} />
+                <Link
+                  href={`/maintenance/new?asset_id=${id}`}
+                  className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                >
+                  <Plus className="h-4 w-4" /> Add Plan
+                </Link>
+              </div>
             </div>
             <div className="divide-y divide-gray-100">
               {plans && plans.length > 0 ? (
                 plans.map((p) => {
-                  const badge = dueStatusBadge(p.next_due_date)
+                  const badge = p.is_active
+                    ? dueStatusBadge(p.next_due_date)
+                    : p.frequency === 'one_time' && p.last_performed_date
+                      ? { label: 'Completed', color: 'bg-green-100 text-green-800' }
+                      : { label: 'Inactive', color: 'bg-gray-100 text-gray-600' }
                   return (
                     <div key={p.id} className="px-6 py-3">
                       <div className="flex items-center justify-between">
@@ -251,7 +283,11 @@ export default async function AssetDetailPage({ params }: PageProps) {
                         </div>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        {p.frequency} • Next due {formatDate(p.next_due_date)}
+                        {p.frequency === 'one_time'
+                          ? p.last_performed_date
+                            ? `One-time • Performed ${formatDate(p.last_performed_date)}`
+                            : `One-time • Due ${formatDate(p.next_due_date)}`
+                          : `${p.frequency.replace('_', ' ')} • Next due ${formatDate(p.next_due_date)}`}
                       </p>
                     </div>
                   )

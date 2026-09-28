@@ -80,7 +80,7 @@ create table maintenance_plans (
   asset_id uuid references assets(id) on delete cascade,
   name text not null,
   description text,
-  frequency text not null check (frequency in ('daily', 'weekly', 'monthly', 'quarterly', 'semi_annual', 'annual', 'custom')),
+  frequency text not null check (frequency in ('one_time', 'daily', 'weekly', 'monthly', 'quarterly', 'semi_annual', 'annual', 'custom')),
   frequency_days integer,
   last_performed_date date,
   next_due_date date not null,

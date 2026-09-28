@@ -73,6 +73,7 @@ const FREQUENCY_OPTIONS = [
   { value: 'quarterly', label: 'Quarterly' },
   { value: 'semi_annual', label: 'Semi-Annual' },
   { value: 'annual', label: 'Annual' },
+  { value: 'one_time', label: 'One-Time (does not repeat)' },
 ]
 
 const PRIORITY_OPTIONS = [
