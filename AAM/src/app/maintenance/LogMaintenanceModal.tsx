@@ -53,7 +53,8 @@ export default function LogMaintenanceModal({ plan, onClose }: LogMaintenanceMod
   const [error, setError] = useState('')
 
   const today = new Date().toISOString().split('T')[0]
-  const suggestedNext = getNextDate(plan.frequency, plan.frequency_days)
+  const isOneTime = plan.frequency === 'one_time'
+  const suggestedNext = isOneTime ? '' : getNextDate(plan.frequency, plan.frequency_days)
 
   const [form, setForm] = useState({
     performed_by: '',
@@ -101,10 +102,12 @@ export default function LogMaintenanceModal({ plan, onClose }: LogMaintenanceMod
     const { error: recordError } = await supabase.from('maintenance_records').insert(recordPayload)
     if (recordError) { setError(recordError.message); setLoading(false); return }
 
-    // Update plan's last_performed_date and next_due_date
+    // Update plan's last_performed_date and next_due_date; a completed one-time plan is closed out
+    // (next_due_date is required, so a blank next date keeps the current one)
     await supabase.from('maintenance_plans').update({
       last_performed_date: form.performed_date,
-      next_due_date: form.next_maintenance_date,
+      ...(form.next_maintenance_date ? { next_due_date: form.next_maintenance_date } : {}),
+      ...(isOneTime && form.status === 'completed' ? { is_active: false } : {}),
     }).eq('id', plan.id)
 
     router.refresh()
@@ -138,7 +141,9 @@ export default function LogMaintenanceModal({ plan, onClose }: LogMaintenanceMod
             <Textarea label="Findings" value={form.findings} onChange={set('findings')} placeholder="What was found during maintenance?" />
           </div>
           <Input label="Parts Replaced" value={form.parts_replaced} onChange={set('parts_replaced')} placeholder="e.g. Filter, oil, belt..." />
-          <Input label="Next Maintenance Date" type="date" value={form.next_maintenance_date} onChange={set('next_maintenance_date')} />
+          {!isOneTime && (
+            <Input label="Next Maintenance Date" type="date" value={form.next_maintenance_date} onChange={set('next_maintenance_date')} />
+          )}
         </div>
 
         <div className="flex gap-3 pt-2">
