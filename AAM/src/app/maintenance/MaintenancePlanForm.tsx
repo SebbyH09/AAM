@@ -4,15 +4,18 @@ import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
-import { AssetPicker, PickerAsset } from '@/components/AssetPicker'
+import { AssetPicker, PickerAsset, PickerGroup } from '@/components/AssetPicker'
+import { groupValue, parseGroupValue, recordTargets, splitCost } from '@/lib/assetPicker'
 import { Button } from '@/components/ui/Button'
 import { MaintenancePlan } from '@/types/database'
 import { MapPin, Plus, Trash2 } from 'lucide-react'
 
 interface MaintenancePlanFormProps {
   assets: PickerAsset[]
+  groups?: PickerGroup[]
   plan?: MaintenancePlan
   defaultAssetId?: string
+  defaultGroupId?: string
 }
 
 const FREQUENCY_OPTIONS = [
@@ -33,14 +36,14 @@ const PRIORITY_OPTIONS = [
   { value: 'critical', label: 'Critical' },
 ]
 
-export default function MaintenancePlanForm({ assets, plan, defaultAssetId }: MaintenancePlanFormProps) {
+export default function MaintenancePlanForm({ assets, groups, plan, defaultAssetId, defaultGroupId }: MaintenancePlanFormProps) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const [form, setForm] = useState({
-    asset_id: plan?.asset_id ?? defaultAssetId ?? '',
+    asset_id: plan?.asset_id ?? defaultAssetId ?? (defaultGroupId ? groupValue(defaultGroupId) : ''),
     name: plan?.name ?? '',
     description: plan?.description ?? '',
     frequency: plan?.frequency ?? 'monthly',
@@ -75,6 +78,11 @@ export default function MaintenancePlanForm({ assets, plan, defaultAssetId }: Ma
       setError('Name and next due date are required.')
       return
     }
+    const targets = recordTargets(form.asset_id, assets)
+    if (targets.length === 0) {
+      setError('That group has no assets to schedule.')
+      return
+    }
     setLoading(true)
     setError('')
 
@@ -98,7 +106,11 @@ export default function MaintenancePlanForm({ assets, plan, defaultAssetId }: Ma
     if (plan) {
       result = await supabase.from('maintenance_plans').update(payload).eq('id', plan.id)
     } else {
-      result = await supabase.from('maintenance_plans').insert(payload)
+      // A group gets its own plan on every unit, so each one tracks its own due date.
+      const costs = splitCost(payload.estimated_cost, targets.length)
+      result = await supabase
+        .from('maintenance_plans')
+        .insert(targets.map((assetId, i) => ({ ...payload, asset_id: assetId, estimated_cost: costs[i] })))
     }
 
     if (result.error) {
@@ -127,6 +139,8 @@ export default function MaintenancePlanForm({ assets, plan, defaultAssetId }: Ma
               onChange={(assetId) => setForm((prev) => ({ ...prev, asset_id: assetId }))}
               placeholder="No asset"
               modalTitle="Link an asset to this maintenance plan"
+              groups={plan ? undefined : groups}
+              hint={parseGroupValue(form.asset_id) ? 'Est. cost is split evenly across the group.' : undefined}
             />
           </div>
           {selectedAsset && (

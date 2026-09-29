@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
-import { AssetPicker, PickerAsset } from '@/components/AssetPicker'
+import { AssetPicker, PickerAsset, PickerGroup } from '@/components/AssetPicker'
+import { groupValue, recordTargets } from '@/lib/assetPicker'
 import { Button } from '@/components/ui/Button'
 
 interface CalibrationRecord {
@@ -24,7 +25,9 @@ interface CalibrationRecord {
 
 interface CalibrationFormProps {
   assets: PickerAsset[]
+  groups?: PickerGroup[]
   calibration?: CalibrationRecord
+  defaultGroupId?: string
 }
 
 const RESULT_OPTIONS = [
@@ -34,7 +37,7 @@ const RESULT_OPTIONS = [
   { value: 'adjusted', label: 'Adjusted' },
 ]
 
-export default function CalibrationForm({ assets, calibration }: CalibrationFormProps) {
+export default function CalibrationForm({ assets, groups, calibration, defaultGroupId }: CalibrationFormProps) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
@@ -43,7 +46,7 @@ export default function CalibrationForm({ assets, calibration }: CalibrationForm
   const today = new Date().toISOString().split('T')[0]
 
   const [form, setForm] = useState({
-    asset_id: calibration?.asset_id ?? '',
+    asset_id: calibration?.asset_id ?? (defaultGroupId ? groupValue(defaultGroupId) : ''),
     calibration_date: calibration?.calibration_date ?? today,
     next_due_date: calibration?.next_due_date ?? '',
     performed_by: calibration?.performed_by ?? '',
@@ -68,6 +71,11 @@ export default function CalibrationForm({ assets, calibration }: CalibrationForm
       setError('Asset, calibration date, next due date, and performed by are required.')
       return
     }
+    const targets = recordTargets(form.asset_id, assets)
+    if (targets.length === 0) {
+      setError('That group has no assets to calibrate.')
+      return
+    }
     setLoading(true)
     setError('')
 
@@ -89,7 +97,9 @@ export default function CalibrationForm({ assets, calibration }: CalibrationForm
     if (calibration) {
       result = await supabase.from('calibration_records').update(payload).eq('id', calibration.id)
     } else {
-      result = await supabase.from('calibration_records').insert(payload)
+      result = await supabase
+        .from('calibration_records')
+        .insert(targets.map((assetId) => ({ ...payload, asset_id: assetId as string })))
     }
 
     if (result.error) {
@@ -118,6 +128,7 @@ export default function CalibrationForm({ assets, calibration }: CalibrationForm
               onChange={(assetId) => setForm((prev) => ({ ...prev, asset_id: assetId }))}
               placeholder="Search for the calibrated asset..."
               modalTitle="Link an asset to this calibration"
+              groups={calibration ? undefined : groups}
             />
           </div>
           <Input label="Calibration Date *" type="date" value={form.calibration_date} onChange={set('calibration_date')} />

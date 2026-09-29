@@ -1,15 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Package, Search, X } from 'lucide-react'
+import { Check, Layers, Package, Search, X } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { cn, statusColor } from '@/lib/utils'
-import { type PickerAsset } from '@/lib/assetPicker'
+import { groupMembers, groupValue, parseGroupValue, type PickerAsset, type PickerGroup } from '@/lib/assetPicker'
 
 // Re-exported so consumers of the picker can type their asset lists without a
 // second import. The constant itself stays in @/lib/assetPicker: Server
 // Components cannot read a value out of a 'use client' module.
-export type { PickerAsset }
+export type { PickerAsset, PickerGroup }
 
 type SearchField = 'name' | 'asset_tag' | 'category' | 'manufacturer' | 'model' | 'serial_number' | 'location' | 'status'
 
@@ -196,6 +196,19 @@ interface AssetSearchModalProps {
   multiple?: boolean
   onSelect: (assetId: string) => void
   title?: string
+  /** When given, matching groups are listed above the assets as whole-group targets. */
+  groups?: PickerGroup[]
+  selectedGroupIds?: string[]
+  onSelectGroup?: (groupId: string) => void
+}
+
+type Entry =
+  | { kind: 'group'; group: PickerGroup; members: PickerAsset[] }
+  | { kind: 'asset'; asset: PickerAsset }
+
+/** A group matches when every plain or name: term appears in its name. */
+function groupMatches(group: PickerGroup, tokens: QueryToken[]): boolean {
+  return tokens.every((t) => (t.field === null || t.field === 'name') && matchScore(group.name, t.term) > 0)
 }
 
 export function AssetSearchModal({ open, ...props }: AssetSearchModalProps) {
@@ -211,6 +224,9 @@ function AssetSearchDialog({
   multiple = false,
   onSelect,
   title = 'Find an asset',
+  groups,
+  selectedGroupIds = [],
+  onSelectGroup,
 }: Omit<AssetSearchModalProps, 'open'>) {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('')
@@ -240,7 +256,20 @@ function AssetSearchDialog({
     return scored.map((entry) => entry.asset)
   }, [assets, tokens, category, status, location])
 
-  const visible = results.slice(0, MAX_RESULTS)
+  const hasFilters = Boolean(category || status || location)
+
+  const groupResults = useMemo(() => {
+    if (!groups || !onSelectGroup || hasFilters) return []
+    return groups
+      .map((group) => ({ group, members: groupMembers(assets, group.id) }))
+      .filter(({ group, members }) => members.length > 0 && groupMatches(group, tokens))
+  }, [groups, onSelectGroup, hasFilters, assets, tokens])
+
+  const entries: Entry[] = [
+    ...groupResults.map((g) => ({ kind: 'group' as const, ...g })),
+    ...results.slice(0, MAX_RESULTS).map((asset) => ({ kind: 'asset' as const, asset })),
+  ]
+  const shownAssets = entries.length - groupResults.length
 
   useEffect(() => {
     const timer = window.setTimeout(() => inputRef.current?.focus(), 0)
@@ -259,11 +288,12 @@ function AssetSearchDialog({
   }, [activeIndex])
 
   const choose = useCallback(
-    (asset: PickerAsset) => {
-      onSelect(asset.id)
+    (entry: Entry) => {
+      if (entry.kind === 'group') onSelectGroup?.(entry.group.id)
+      else onSelect(entry.asset.id)
       if (!multiple) onClose()
     },
-    [multiple, onClose, onSelect]
+    [multiple, onClose, onSelect, onSelectGroup]
   )
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -274,7 +304,7 @@ function AssetSearchDialog({
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setActiveIndex((prev) => Math.min(prev + 1, visible.length - 1))
+      setActiveIndex((prev) => Math.min(prev + 1, entries.length - 1))
       return
     }
     if (e.key === 'ArrowUp') {
@@ -284,12 +314,11 @@ function AssetSearchDialog({
     }
     if (e.key === 'Enter') {
       e.preventDefault()
-      const asset = visible[activeIndex]
-      if (asset) choose(asset)
+      const entry = entries[activeIndex]
+      if (entry) choose(entry)
     }
   }
 
-  const hasFilters = Boolean(category || status || location)
   const filterSelect = 'rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
 
   return (
@@ -397,7 +426,7 @@ function AssetSearchDialog({
         </div>
 
         <div ref={listRef} className="flex-1 overflow-y-auto">
-          {visible.length === 0 ? (
+          {entries.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <Package className="mx-auto h-8 w-8 text-gray-300" />
               <p className="mt-2 text-sm text-gray-500">No assets match your search.</p>
@@ -405,15 +434,49 @@ function AssetSearchDialog({
             </div>
           ) : (
             <ul className="divide-y divide-gray-100">
-              {visible.map((asset, index) => {
-                const isSelected = selectedIds.includes(asset.id)
+              {entries.map((entry, index) => {
                 const isActive = index === activeIndex
+                if (entry.kind === 'group') {
+                  const { group, members } = entry
+                  const isSelected = selectedGroupIds.includes(group.id)
+                  return (
+                    <li key={`group-${group.id}`}>
+                      <button
+                        type="button"
+                        data-index={index}
+                        onClick={() => choose(entry)}
+                        onMouseEnter={() => setActiveIndex(index)}
+                        className={cn(
+                          'flex w-full items-start gap-3 px-6 py-3 text-left transition-colors',
+                          isActive ? 'bg-blue-50' : 'hover:bg-gray-50',
+                          isSelected && 'bg-blue-50/60'
+                        )}
+                      >
+                        <Layers className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">
+                              <Highlight text={group.name} terms={termsForField(tokens, 'name')} />
+                            </span>
+                            <Badge className="bg-blue-100 text-blue-700">
+                              Whole group • {members.length} asset{members.length === 1 ? '' : 's'}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 truncate text-xs text-gray-500">{members.map((m) => m.name).join(', ')}</p>
+                        </div>
+                        {isSelected && <Check className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />}
+                      </button>
+                    </li>
+                  )
+                }
+                const { asset } = entry
+                const isSelected = selectedIds.includes(asset.id)
                 return (
                   <li key={asset.id}>
                     <button
                       type="button"
                       data-index={index}
-                      onClick={() => choose(asset)}
+                      onClick={() => choose(entry)}
                       onMouseEnter={() => setActiveIndex(index)}
                       className={cn(
                         'flex w-full items-start gap-3 px-6 py-3 text-left transition-colors',
@@ -455,9 +518,9 @@ function AssetSearchDialog({
               })}
             </ul>
           )}
-          {results.length > visible.length && (
+          {results.length > shownAssets && (
             <p className="border-t border-gray-100 px-6 py-3 text-center text-xs text-gray-500">
-              Showing first {visible.length} of {results.length} matches — keep typing to narrow it down.
+              Showing first {shownAssets} of {results.length} matches — keep typing to narrow it down.
             </p>
           )}
         </div>
@@ -491,9 +554,14 @@ interface AssetPickerProps {
   allowClear?: boolean
   modalTitle?: string
   disabled?: boolean
+  /**
+   * Offer whole groups as targets. A group comes back through onChange as
+   * `groupValue(id)`; expand it with `resolveAssetIds` when saving.
+   */
+  groups?: PickerGroup[]
 }
 
-/** Single-asset field: shows the linked asset and opens the search modal. */
+/** Single-asset field: shows the linked asset (or group) and opens the search modal. */
 export function AssetPicker({
   assets,
   value,
@@ -505,10 +573,17 @@ export function AssetPicker({
   allowClear = true,
   modalTitle = 'Find an asset',
   disabled,
+  groups,
 }: AssetPickerProps) {
   const [open, setOpen] = useState(false)
-  const selected = assets.find((a) => a.id === value)
+  const selectedGroupId = parseGroupValue(value)
+  const selectedGroup = selectedGroupId ? groups?.find((g) => g.id === selectedGroupId) : undefined
+  const groupAssets = selectedGroupId ? groupMembers(assets, selectedGroupId) : []
+  const selected = selectedGroupId ? undefined : assets.find((a) => a.id === value)
   const meta = selected ? assetMeta(selected) : []
+  // Picked one piece of a group: offer to widen the entry to the whole unit.
+  const siblingGroup = selected?.group_id ? groups?.find((g) => g.id === selected.group_id) : undefined
+  const siblingCount = siblingGroup ? groupMembers(assets, siblingGroup.id).length : 0
 
   return (
     <div className="space-y-1">
@@ -526,8 +601,24 @@ export function AssetPicker({
           onClick={() => setOpen(true)}
           className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-not-allowed"
         >
-          <Search className="h-4 w-4 shrink-0 text-gray-400" />
-          {selected ? (
+          {selectedGroupId ? (
+            <Layers className="h-4 w-4 shrink-0 text-blue-600" />
+          ) : (
+            <Search className="h-4 w-4 shrink-0 text-gray-400" />
+          )}
+          {selectedGroupId ? (
+            <span className="min-w-0">
+              <span className="block truncate text-sm text-gray-900">
+                {selectedGroup?.name ?? 'Asset group'}
+                <span className="ml-1 text-gray-500">
+                  (whole group • {groupAssets.length} asset{groupAssets.length === 1 ? '' : 's'})
+                </span>
+              </span>
+              <span className="block truncate text-xs text-gray-500">
+                {groupAssets.length > 0 ? groupAssets.map((a) => a.name).join(', ') : 'No assets in this group'}
+              </span>
+            </span>
+          ) : selected ? (
             <span className="min-w-0">
               <span className="block truncate text-sm text-gray-900">
                 {selected.name}
@@ -566,14 +657,34 @@ export function AssetPicker({
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
       {hint && !error && <p className="text-xs text-gray-500">{hint}</p>}
+      {selectedGroupId && !error && (
+        <p className="text-xs text-blue-700">
+          A separate record will be saved on each of the {groupAssets.length} asset{groupAssets.length === 1 ? '' : 's'} in this group.
+        </p>
+      )}
+      {siblingGroup && siblingCount > 1 && !disabled && (
+        <p className="text-xs text-gray-500">
+          Part of <span className="font-medium text-gray-700">{siblingGroup.name}</span>.{' '}
+          <button
+            type="button"
+            onClick={() => onChange(groupValue(siblingGroup.id))}
+            className="font-medium text-blue-600 hover:text-blue-800"
+          >
+            Apply to all {siblingCount} assets in the group
+          </button>
+        </p>
+      )}
 
       <AssetSearchModal
         open={open}
         onClose={() => setOpen(false)}
         assets={assets}
-        selectedIds={value ? [value] : []}
+        selectedIds={value && !selectedGroupId ? [value] : []}
         onSelect={(assetId) => onChange(assetId)}
         title={modalTitle}
+        groups={groups}
+        selectedGroupIds={selectedGroupId ? [selectedGroupId] : []}
+        onSelectGroup={groups ? (groupId) => onChange(groupValue(groupId)) : undefined}
       />
     </div>
   )
@@ -586,6 +697,8 @@ interface AssetMultiPickerProps {
   label?: string
   hint?: string
   modalTitle?: string
+  /** Offer whole groups: picking one adds (or removes) all its assets. */
+  groups?: PickerGroup[]
 }
 
 /** Multi-asset field (e.g. assets covered by a service contract). */
@@ -596,12 +709,28 @@ export function AssetMultiPicker({
   label,
   hint,
   modalTitle = 'Find assets',
+  groups,
 }: AssetMultiPickerProps) {
   const [open, setOpen] = useState(false)
   const selected = assets.filter((a) => values.includes(a.id))
+  const fullGroupIds = (groups ?? [])
+    .filter((g) => {
+      const members = groupMembers(assets, g.id)
+      return members.length > 0 && members.every((m) => values.includes(m.id))
+    })
+    .map((g) => g.id)
 
   function toggle(assetId: string) {
     onChange(values.includes(assetId) ? values.filter((id) => id !== assetId) : [...values, assetId])
+  }
+
+  function toggleGroup(groupId: string) {
+    const memberIds = groupMembers(assets, groupId).map((a) => a.id)
+    onChange(
+      fullGroupIds.includes(groupId)
+        ? values.filter((id) => !memberIds.includes(id))
+        : [...values, ...memberIds.filter((id) => !values.includes(id))]
+    )
   }
 
   return (
@@ -634,7 +763,7 @@ export function AssetMultiPicker({
           className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 text-left text-sm text-gray-500 hover:bg-gray-50"
         >
           <Search className="h-4 w-4 text-gray-400" />
-          Search assets by name, tag, model #, serial #...
+          {groups ? 'Search assets or groups by name, tag, model #, serial #...' : 'Search assets by name, tag, model #, serial #...'}
         </button>
       </div>
       <p className="text-xs text-gray-500">
@@ -652,6 +781,9 @@ export function AssetMultiPicker({
         multiple
         onSelect={toggle}
         title={modalTitle}
+        groups={groups}
+        selectedGroupIds={fullGroupIds}
+        onSelectGroup={groups ? toggleGroup : undefined}
       />
     </div>
   )

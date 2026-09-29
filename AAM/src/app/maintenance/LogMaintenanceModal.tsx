@@ -35,7 +35,7 @@ const STATUS_OPTIONS = [
   { value: 'requires_followup', label: 'Requires Follow-up' },
 ]
 
-function getNextDate(frequency: string, frequencyDays: number | null | undefined): string {
+export function getNextDate(frequency: string, frequencyDays: number | null | undefined): string {
   const now = new Date()
   const map: Record<string, number> = {
     daily: 1, weekly: 7, monthly: 30, quarterly: 90,

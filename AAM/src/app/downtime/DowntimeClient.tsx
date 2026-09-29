@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatDateTime, formatCurrency } from '@/lib/utils'
 import { Clock, Plus, Search, ArrowUpDown } from 'lucide-react'
 import LogDowntimeModal from './LogDowntimeModal'
+import type { PickerAsset, PickerGroup } from '@/lib/assetPicker'
 import EndDowntimeModal from './EndDowntimeModal'
 
 interface DowntimeEvent {
@@ -20,15 +21,10 @@ interface DowntimeEvent {
   assets: { name: string; asset_tag: string | null; serial_number: string | null; model: string | null } | null
 }
 
-interface Asset {
-  id: string
-  name: string
-  asset_tag: string | null
-}
-
 interface DowntimeClientProps {
   events: DowntimeEvent[]
-  assets: Asset[]
+  assets: PickerAsset[]
+  groups: PickerGroup[]
 }
 
 const REASON_COLORS: Record<string, string> = {
@@ -45,7 +41,7 @@ const REASON_FILTERS = ['all', 'breakdown', 'scheduled_maintenance', 'repair', '
 type SortField = 'start_time' | 'duration_hours' | 'cost_impact'
 type SortDir = 'asc' | 'desc'
 
-export default function DowntimeClient({ events, assets }: DowntimeClientProps) {
+export default function DowntimeClient({ events, assets, groups }: DowntimeClientProps) {
   const [showLogModal, setShowLogModal] = useState(false)
   const [endingEvent, setEndingEvent] = useState<DowntimeEvent | null>(null)
   const [search, setSearch] = useState('')
@@ -266,7 +262,7 @@ export default function DowntimeClient({ events, assets }: DowntimeClientProps) 
       </div>
 
       {showLogModal && (
-        <LogDowntimeModal assets={assets} onClose={() => setShowLogModal(false)} />
+        <LogDowntimeModal assets={assets} groups={groups} onClose={() => setShowLogModal(false)} />
       )}
       {endingEvent && (
         <EndDowntimeModal event={endingEvent} onClose={() => setEndingEvent(null)} />

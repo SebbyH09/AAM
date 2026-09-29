@@ -4,14 +4,17 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
-import { AssetPicker, PickerAsset } from '@/components/AssetPicker'
+import { AssetPicker, PickerAsset, PickerGroup } from '@/components/AssetPicker'
+import { groupValue, parseGroupValue, recordTargets, splitCost } from '@/lib/assetPicker'
 import { Button } from '@/components/ui/Button'
 import { WorkOrder } from '@/types/database'
 
 interface WorkOrderFormProps {
   assets: PickerAsset[]
+  groups?: PickerGroup[]
   workOrder?: WorkOrder
   defaultAssetId?: string
+  defaultGroupId?: string
 }
 
 const CATEGORY_OPTIONS = [
@@ -39,7 +42,7 @@ const STATUS_OPTIONS = [
   { value: 'cancelled', label: 'Cancelled' },
 ]
 
-export default function WorkOrderForm({ assets, workOrder, defaultAssetId }: WorkOrderFormProps) {
+export default function WorkOrderForm({ assets, groups, workOrder, defaultAssetId, defaultGroupId }: WorkOrderFormProps) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
@@ -48,7 +51,7 @@ export default function WorkOrderForm({ assets, workOrder, defaultAssetId }: Wor
   const today = new Date().toISOString().split('T')[0]
 
   const [form, setForm] = useState({
-    asset_id: workOrder?.asset_id ?? defaultAssetId ?? '',
+    asset_id: workOrder?.asset_id ?? defaultAssetId ?? (defaultGroupId ? groupValue(defaultGroupId) : ''),
     work_order_number: workOrder?.work_order_number ?? '',
     title: workOrder?.title ?? '',
     description: workOrder?.description ?? '',
@@ -73,6 +76,11 @@ export default function WorkOrderForm({ assets, workOrder, defaultAssetId }: Wor
     e.preventDefault()
     if (!form.title || !form.request_date) {
       setError('Title and request date are required.')
+      return
+    }
+    const targets = recordTargets(form.asset_id, assets)
+    if (targets.length === 0) {
+      setError('That group has no assets to create a work order for.')
       return
     }
     setLoading(true)
@@ -100,7 +108,10 @@ export default function WorkOrderForm({ assets, workOrder, defaultAssetId }: Wor
     if (workOrder) {
       result = await supabase.from('work_orders').update(payload).eq('id', workOrder.id)
     } else {
-      result = await supabase.from('work_orders').insert(payload)
+      const costs = splitCost(payload.cost, targets.length)
+      result = await supabase
+        .from('work_orders')
+        .insert(targets.map((assetId, i) => ({ ...payload, asset_id: assetId, cost: costs[i] })))
     }
 
     if (result.error) {
@@ -132,6 +143,8 @@ export default function WorkOrderForm({ assets, workOrder, defaultAssetId }: Wor
               onChange={(assetId) => setForm((prev) => ({ ...prev, asset_id: assetId }))}
               placeholder="No asset (general work order)"
               modalTitle="Link an asset to this work order"
+              groups={workOrder ? undefined : groups}
+              hint={parseGroupValue(form.asset_id) ? 'Cost is split evenly across the group.' : undefined}
             />
           </div>
           <Input label="Work Order Number" value={form.work_order_number} onChange={set('work_order_number')} placeholder="e.g. WO-2024-001" />

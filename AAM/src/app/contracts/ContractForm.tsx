@@ -6,11 +6,12 @@ import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { ServiceContract } from '@/types/database'
-import { AssetMultiPicker, PickerAsset } from '@/components/AssetPicker'
+import { AssetMultiPicker, PickerAsset, PickerGroup } from '@/components/AssetPicker'
 import { Upload, X } from 'lucide-react'
 
 interface ContractFormProps {
   assets: PickerAsset[]
+  groups?: PickerGroup[]
   contract?: ServiceContract
   defaultAssetIds?: string[]
   existingItems?: { id: string; description: string; quantity: number; unit_cost: number | null; notes: string | null }[]
@@ -29,7 +30,7 @@ const STATUS_OPTIONS = [
   { value: 'expired', label: 'Expired' },
 ]
 
-export default function ContractForm({ assets, contract, defaultAssetIds }: ContractFormProps) {
+export default function ContractForm({ assets, groups, contract, defaultAssetIds }: ContractFormProps) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
@@ -168,7 +169,8 @@ export default function ContractForm({ assets, contract, defaultAssetIds }: Cont
               assets={assets}
               values={selectedAssetIds}
               onChange={setSelectedAssetIds}
-              modalTitle="Link assets to this contract"
+              modalTitle="Link assets or a whole group to this contract"
+              groups={groups}
             />
           </div>
 
