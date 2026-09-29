@@ -6,6 +6,7 @@ import { StatCard } from '@/components/ui/Card'
 import { formatCurrency } from '@/lib/utils'
 import BudgetsClient, { SpendingRecord } from './BudgetsClient'
 import { redirect } from 'next/navigation'
+import { getHiddenPages, isPathHidden } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,7 @@ export default async function BudgetsPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (user?.user_metadata?.role !== 'admin') redirect('/')
+  if (isPathHidden('/budgets', await getHiddenPages(supabase, user?.user_metadata?.role))) redirect('/')
   const currentYear = new Date().getFullYear()
 
   const [

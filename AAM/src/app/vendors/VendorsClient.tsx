@@ -100,7 +100,7 @@ export default function VendorsClient({ vendors }: VendorsClientProps) {
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white">
               {filtered.map((vendor) => (
-                <tr key={vendor.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={vendor.id} className="hover:bg-blue-50 transition-colors">
                   <td className="px-6 py-4">
                     <p className="text-sm font-medium text-gray-900">{vendor.name}</p>
                   </td>

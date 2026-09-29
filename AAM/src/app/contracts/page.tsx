@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import ContractsClient from './ContractsClient'
 import { redirect } from 'next/navigation'
+import { getHiddenPages, isPathHidden } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +12,7 @@ export default async function ContractsPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (user?.user_metadata?.role !== 'admin') redirect('/')
+  if (isPathHidden('/contracts', await getHiddenPages(supabase, user?.user_metadata?.role))) redirect('/')
 
   const { data: contracts } = await supabase
     .from('service_contracts')

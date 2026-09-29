@@ -157,7 +157,7 @@ export default function ScheduleClient({ events }: ScheduleClientProps) {
                     <Link
                       key={event.id}
                       href={event.href}
-                      className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors"
+                      className="flex items-center gap-4 px-5 py-3 hover-row"
                     >
                       <div className="shrink-0">{TYPE_ICONS[event.type]}</div>
                       <div className="min-w-0 flex-1">

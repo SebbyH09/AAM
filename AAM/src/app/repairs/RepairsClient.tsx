@@ -126,7 +126,7 @@ export default function RepairsClient({ repairs }: RepairsClientProps) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map((repair) => (
-                <tr key={repair.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={repair.id} className="hover:bg-blue-50 transition-colors">
                   <td className="px-6 py-4">
                     <p className="text-sm font-medium text-gray-900 max-w-xs truncate">{repair.description}</p>
                     <p className="text-xs text-gray-500">

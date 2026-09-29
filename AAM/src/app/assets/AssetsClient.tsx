@@ -1,23 +1,28 @@
 'use client'
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { Fragment, useState, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, statusColor } from '@/lib/utils'
-import { Asset } from '@/types/database'
+import { Asset, AssetGroup } from '@/types/database'
 import Link from 'next/link'
-import { Search, Package, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Download, ChevronDown, X } from 'lucide-react'
+import { Search, Package, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Download, ChevronDown, X, Layers, List, Unlink } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { createClient } from '@/lib/supabase/client'
+import { useAssetCategories } from '@/hooks/useAssetCategories'
+import GroupAssetsModal from './GroupAssetsModal'
 
-const CATEGORIES = ['All', 'Analytical', 'Lab Equipment', 'HVAC', 'IT/Network', 'Electrical', 'Mechanical', 'Other']
 const STATUSES = ['all', 'active', 'inactive', 'repair', 'decommissioned']
+const COLUMN_COUNT = 8
 
 interface AssetsClientProps {
   assets: Asset[]
+  groups: AssetGroup[]
 }
 
 type SortField = 'name' | 'category' | 'location' | 'status' | 'purchase_date' | 'date_installed'
 type SortDir = 'asc' | 'desc'
+type ViewMode = 'list' | 'grouped'
 
 const FILTERS_STORAGE_KEY = 'assets-list-filters'
 
@@ -27,6 +32,7 @@ interface StoredFilters {
   selectedStatus: string
   sortField: SortField
   sortDir: SortDir
+  viewMode: ViewMode
 }
 
 function loadStoredFilters(): Partial<StoredFilters> {
@@ -39,9 +45,10 @@ function loadStoredFilters(): Partial<StoredFilters> {
   }
 }
 
-function exportAssets(assets: Asset[], format: 'xlsx' | 'csv') {
+function exportAssets(assets: Asset[], groupsById: Map<string, AssetGroup>, format: 'xlsx' | 'csv') {
   const rows = assets.map((a) => ({
     'Name': a.name,
+    'Group': (a.group_id && groupsById.get(a.group_id)?.name) || '',
     'Asset Tag': a.asset_tag ?? '',
     'Category': a.category,
     'Manufacturer': a.manufacturer ?? '',
@@ -68,7 +75,7 @@ function exportAssets(assets: Asset[], format: 'xlsx' | 'csv') {
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Assets')
   ws['!cols'] = [
-    { wch: 24 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 20 },
+    { wch: 24 }, { wch: 20 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 20 },
     { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 14 },
     { wch: 14 }, { wch: 30 }, { wch: 20 }, { wch: 14 }, { wch: 12 },
     { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 22 }, { wch: 24 }, { wch: 24 },
@@ -81,14 +88,21 @@ function exportAssets(assets: Asset[], format: 'xlsx' | 'csv') {
   }
 }
 
-export default function AssetsClient({ assets }: AssetsClientProps) {
+export default function AssetsClient({ assets, groups }: AssetsClientProps) {
   const router = useRouter()
+  const categories = useAssetCategories()
+  const groupsById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups])
   const [stored] = useState(loadStoredFilters)
   const [search, setSearch] = useState(stored.search ?? '')
   const [selectedCategory, setSelectedCategory] = useState(stored.selectedCategory ?? 'All')
   const [selectedStatus, setSelectedStatus] = useState(stored.selectedStatus ?? 'all')
   const [sortField, setSortField] = useState<SortField>(stored.sortField ?? 'name')
   const [sortDir, setSortDir] = useState<SortDir>(stored.sortDir ?? 'asc')
+  const [viewMode, setViewMode] = useState<ViewMode>(stored.viewMode ?? 'list')
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [groupModalOpen, setGroupModalOpen] = useState(false)
+  const [ungrouping, setUngrouping] = useState(false)
+  const [actionError, setActionError] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const exportRef = useRef<HTMLDivElement>(null)
@@ -107,16 +121,18 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
-      const toStore: StoredFilters = { search, selectedCategory, selectedStatus, sortField, sortDir }
+      const toStore: StoredFilters = { search, selectedCategory, selectedStatus, sortField, sortDir, viewMode }
       window.sessionStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(toStore))
     } catch {
       // Ignore storage errors (e.g. private mode / quota).
     }
-  }, [search, selectedCategory, selectedStatus, sortField, sortDir])
+  }, [search, selectedCategory, selectedStatus, sortField, sortDir, viewMode])
 
   const filtered = assets.filter((a) => {
+    const groupName = a.group_id ? groupsById.get(a.group_id)?.name : undefined
     const matchSearch =
       search === '' ||
+      (groupName?.toLowerCase().includes(search.toLowerCase())) ||
       a.name.toLowerCase().includes(search.toLowerCase()) ||
       (a.asset_tag?.toLowerCase().includes(search.toLowerCase())) ||
       (a.serial_number?.toLowerCase().includes(search.toLowerCase())) ||
@@ -180,6 +196,59 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
     })
   }
 
+  // Grouped view: each group with visible members, in name order, then everything ungrouped.
+  const groupedSections = useMemo(() => {
+    const byGroup = new Map<string, Asset[]>()
+    const ungrouped: Asset[] = []
+    for (const a of sorted) {
+      if (a.group_id && groupsById.has(a.group_id)) {
+        const list = byGroup.get(a.group_id) ?? []
+        list.push(a)
+        byGroup.set(a.group_id, list)
+      } else {
+        ungrouped.push(a)
+      }
+    }
+    const sections = [...byGroup.entries()]
+      .map(([id, members]) => ({ group: groupsById.get(id)!, members }))
+      .sort((a, b) => a.group.name.localeCompare(b.group.name))
+    return { sections, ungrouped }
+  }, [sorted, groupsById])
+
+  function toggleGroupCollapsed(id: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectMany(ids: string[]) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      const allSelected = ids.every((id) => next.has(id))
+      ids.forEach((id) => (allSelected ? next.delete(id) : next.add(id)))
+      return next
+    })
+  }
+
+  async function removeSelectedFromGroups() {
+    const ids = selectedVisible.filter((a) => a.group_id).map((a) => a.id)
+    if (ids.length === 0) return
+    setUngrouping(true)
+    setActionError('')
+    const { error } = await createClient().from('assets').update({ group_id: null }).in('id', ids)
+    setUngrouping(false)
+    if (error) {
+      setActionError(error.message)
+      return
+    }
+    router.refresh()
+  }
+
+  const selectedInGroups = selectedVisible.filter((a) => a.group_id).length
+
   // Export the checked assets when there's a selection, otherwise everything shown.
   const exportRows = selectedVisible.length > 0 ? selectedVisible : sorted
 
@@ -197,6 +266,57 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
     return sortDir === 'asc'
       ? <ArrowUp className="h-3 w-3 text-blue-600" />
       : <ArrowDown className="h-3 w-3 text-blue-600" />
+  }
+
+  function renderRow(asset: Asset, nested = false) {
+    const group = asset.group_id ? groupsById.get(asset.group_id) : undefined
+    return (
+      <tr
+        key={asset.id}
+        onClick={() => router.push(`/assets/${asset.id}`)}
+        className={`transition-colors cursor-pointer ${
+          selectedIds.has(asset.id) ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-blue-50'
+        }`}
+      >
+        <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            aria-label={`Select ${asset.name}`}
+            checked={selectedIds.has(asset.id)}
+            onChange={() => toggleSelect(asset.id)}
+            className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+        </td>
+        <td className={`px-6 py-4 ${nested ? 'pl-12' : ''}`}>
+          <div className={nested ? 'border-l-2 border-blue-200 pl-3' : ''}>
+            <p className="text-sm font-medium text-gray-900">{asset.name}</p>
+            <p className="text-xs text-gray-500">
+              {[asset.asset_tag, asset.manufacturer, asset.model].filter(Boolean).join(' • ')}
+            </p>
+            {group && !nested && (
+              <Link
+                href={`/assets/groups/${group.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="mt-1 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+              >
+                <Layers className="h-3 w-3" />
+                {group.name}
+              </Link>
+            )}
+          </div>
+        </td>
+        <td className="px-6 py-4 text-sm text-gray-600">{asset.category}</td>
+        <td className="px-6 py-4 text-sm text-gray-600">{asset.location ?? '—'}</td>
+        <td className="px-6 py-4">
+          <Badge className={statusColor(asset.status)}>{asset.status}</Badge>
+        </td>
+        <td className="px-6 py-4 text-sm text-gray-600">{formatDate(asset.purchase_date)}</td>
+        <td className="px-6 py-4 text-sm text-gray-600">{formatDate(asset.date_installed)}</td>
+        <td className="px-6 py-4 text-right">
+          <ChevronRight className="h-4 w-4 text-gray-400" />
+        </td>
+      </tr>
+    )
   }
 
   return (
@@ -224,6 +344,20 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
           )}
         </div>
         <div className="flex gap-2 flex-wrap items-center">
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            aria-label="Filter by category"
+            className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="All">All categories</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+            {selectedCategory !== 'All' && !categories.includes(selectedCategory) && (
+              <option value={selectedCategory}>{selectedCategory}</option>
+            )}
+          </select>
           {STATUSES.map((s) => (
             <button
               key={s}
@@ -237,6 +371,26 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
               {s}
             </button>
           ))}
+
+          {/* List / grouped view toggle */}
+          <div className="inline-flex rounded-lg border border-gray-300 bg-white p-0.5">
+            {([
+              { mode: 'list', label: 'List', icon: List },
+              { mode: 'grouped', label: 'Grouped', icon: Layers },
+            ] as const).map(({ mode, label, icon: Icon }) => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                aria-pressed={viewMode === mode}
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  viewMode === mode ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
 
           {/* Export dropdown */}
           <div ref={exportRef} className="relative">
@@ -257,13 +411,13 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
                     : `All ${sorted.length} asset${sorted.length === 1 ? '' : 's'} shown`}
                 </p>
                 <button
-                  onClick={() => { exportAssets(exportRows, 'xlsx'); setExportOpen(false) }}
+                  onClick={() => { exportAssets(exportRows, groupsById, 'xlsx'); setExportOpen(false) }}
                   className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                 >
                   Export as Excel
                 </button>
                 <button
-                  onClick={() => { exportAssets(exportRows, 'csv'); setExportOpen(false) }}
+                  onClick={() => { exportAssets(exportRows, groupsById, 'csv'); setExportOpen(false) }}
                   className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-b-lg border-t border-gray-100"
                 >
                   Export as CSV
@@ -273,6 +427,47 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
           </div>
         </div>
       </div>
+
+      {/* Bulk actions for the checked assets */}
+      {selectedVisible.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
+          <p className="text-sm font-medium text-blue-900">
+            {selectedVisible.length} selected
+          </p>
+          <button
+            onClick={() => setGroupModalOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+          >
+            <Layers className="h-3.5 w-3.5" />
+            Group as one unit
+          </button>
+          {selectedInGroups > 0 && (
+            <button
+              onClick={removeSelectedFromGroups}
+              disabled={ungrouping}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <Unlink className="h-3.5 w-3.5" />
+              Remove from group{selectedInGroups === 1 ? '' : 's'}
+            </button>
+          )}
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="ml-auto text-xs font-medium text-blue-700 hover:text-blue-900"
+          >
+            Clear selection
+          </button>
+          {actionError && <p className="w-full text-xs text-red-600">{actionError}</p>}
+        </div>
+      )}
+
+      <GroupAssetsModal
+        open={groupModalOpen}
+        onClose={() => setGroupModalOpen(false)}
+        assets={selectedVisible}
+        groups={groups}
+        onDone={() => { setGroupModalOpen(false); setSelectedIds(new Set()); setViewMode('grouped') }}
+      />
 
       {/* Asset Grid */}
       {sorted.length === 0 ? (
@@ -338,43 +533,64 @@ export default function AssetsClient({ assets }: AssetsClientProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {sorted.map((asset) => (
-                <tr
-                  key={asset.id}
-                  onClick={() => router.push(`/assets/${asset.id}`)}
-                  className={`transition-colors cursor-pointer ${
-                    selectedIds.has(asset.id) ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'
-                  }`}
-                >
-                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      aria-label={`Select ${asset.name}`}
-                      checked={selectedIds.has(asset.id)}
-                      onChange={() => toggleSelect(asset.id)}
-                      className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{asset.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {[asset.asset_tag, asset.manufacturer, asset.model].filter(Boolean).join(' • ')}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{asset.category}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{asset.location ?? '—'}</td>
-                  <td className="px-6 py-4">
-                    <Badge className={statusColor(asset.status)}>{asset.status}</Badge>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{formatDate(asset.purchase_date)}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{formatDate(asset.date_installed)}</td>
-                  <td className="px-6 py-4 text-right">
-                    <ChevronRight className="h-4 w-4 text-gray-400" />
-                  </td>
-                </tr>
-              ))}
+              {viewMode === 'list' ? (
+                sorted.map((asset) => renderRow(asset))
+              ) : (
+                <>
+                  {groupedSections.sections.map(({ group, members }) => {
+                    const collapsed = collapsedGroups.has(group.id)
+                    const memberIds = members.map((m) => m.id)
+                    const checkedCount = memberIds.filter((id) => selectedIds.has(id)).length
+                    return (
+                      <Fragment key={group.id}>
+                        <tr
+                          onClick={() => toggleGroupCollapsed(group.id)}
+                          className="cursor-pointer bg-slate-50 transition-colors hover:bg-blue-50"
+                        >
+                          <td className="px-6 py-3" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              aria-label={`Select all assets in ${group.name}`}
+                              checked={checkedCount === memberIds.length}
+                              ref={(el) => { if (el) el.indeterminate = checkedCount > 0 && checkedCount < memberIds.length }}
+                              onChange={() => toggleSelectMany(memberIds)}
+                              className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                          </td>
+                          <td colSpan={COLUMN_COUNT - 1} className="px-6 py-3">
+                            <div className="flex items-center gap-3">
+                              <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
+                              <Layers className="h-4 w-4 text-blue-600" />
+                              <Link
+                                href={`/assets/groups/${group.id}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-sm font-semibold text-gray-900 hover:text-blue-700 hover:underline"
+                              >
+                                {group.name}
+                              </Link>
+                              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                                {members.length} piece{members.length === 1 ? '' : 's'}
+                              </span>
+                              {group.description && (
+                                <span className="hidden truncate text-xs text-gray-500 md:inline">{group.description}</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {!collapsed && members.map((asset) => renderRow(asset, true))}
+                      </Fragment>
+                    )
+                  })}
+                  {groupedSections.ungrouped.length > 0 && groupedSections.sections.length > 0 && (
+                    <tr className="no-hover bg-slate-50">
+                      <td colSpan={COLUMN_COUNT} className="px-6 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                        Not grouped
+                      </td>
+                    </tr>
+                  )}
+                  {groupedSections.ungrouped.map((asset) => renderRow(asset))}
+                </>
+              )}
             </tbody>
           </table>
         </div>

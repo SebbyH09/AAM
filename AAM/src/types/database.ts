@@ -64,6 +64,21 @@ export interface Database {
         Insert: Omit<ServiceReport, 'id' | 'created_at'>
         Update: Partial<Omit<ServiceReport, 'id' | 'created_at'>>
       }
+      asset_groups: {
+        Row: AssetGroup
+        Insert: Omit<AssetGroup, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<AssetGroup, 'id' | 'created_at' | 'updated_at'>>
+      }
+      asset_categories: {
+        Row: AssetCategory
+        Insert: Omit<AssetCategory, 'id' | 'created_at'>
+        Update: Partial<Omit<AssetCategory, 'id' | 'created_at'>>
+      }
+      role_page_access: {
+        Row: RolePageAccess
+        Insert: Omit<RolePageAccess, 'updated_at'>
+        Update: Partial<Omit<RolePageAccess, 'updated_at'>>
+      }
       notification_log: {
         Row: NotificationLog
         Insert: Omit<NotificationLog, 'id' | 'sent_at'>
@@ -96,7 +111,31 @@ export interface Asset {
   ventilation_requirements: string | null
   environmental_requirements: string | null
   facilities_notes: string | null
+  group_id: string | null
   created_at: string
+  updated_at: string
+}
+
+/** A labelled bundle of assets treated as one unit, e.g. the modules of an LC stack. */
+export interface AssetGroup {
+  id: string
+  name: string
+  description: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AssetCategory {
+  id: string
+  name: string
+  sort_order: number
+  created_at: string
+}
+
+export interface RolePageAccess {
+  role: string
+  page: string
+  can_view: boolean
   updated_at: string
 }
 

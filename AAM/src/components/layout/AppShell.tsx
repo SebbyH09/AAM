@@ -8,9 +8,10 @@ import { MobileMenuContext } from '@/contexts/MobileMenuContext'
 interface AppShellProps {
   children: React.ReactNode
   userRole: string | null
+  hiddenPages: string[]
 }
 
-export default function AppShell({ children, userRole }: AppShellProps) {
+export default function AppShell({ children, userRole, hiddenPages }: AppShellProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const isLoginPage = pathname === '/login'
@@ -24,7 +25,7 @@ export default function AppShell({ children, userRole }: AppShellProps) {
       <div className="flex h-screen bg-gray-50">
         {/* Desktop sidebar */}
         <div className="hidden md:flex">
-          <Sidebar userRole={userRole} />
+          <Sidebar userRole={userRole} hiddenPages={hiddenPages} />
         </div>
 
         {/* Mobile backdrop */}
@@ -41,7 +42,7 @@ export default function AppShell({ children, userRole }: AppShellProps) {
             mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <Sidebar userRole={userRole} onClose={() => setMobileMenuOpen(false)} />
+          <Sidebar userRole={userRole} hiddenPages={hiddenPages} onClose={() => setMobileMenuOpen(false)} />
         </div>
 
         <main className="flex-1 overflow-auto">

@@ -5,19 +5,9 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { Asset } from '@/types/database'
+import { Asset, AssetGroup } from '@/types/database'
+import { useAssetCategories } from '@/hooks/useAssetCategories'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-
-const CATEGORY_OPTIONS = [
-  { value: '', label: 'Select category...' },
-  { value: 'Analytical', label: 'Analytical' },
-  { value: 'Lab Equipment', label: 'Lab Equipment' },
-  { value: 'HVAC', label: 'HVAC' },
-  { value: 'IT/Network', label: 'IT/Network' },
-  { value: 'Electrical', label: 'Electrical' },
-  { value: 'Mechanical', label: 'Mechanical' },
-  { value: 'Other', label: 'Other' },
-]
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -26,13 +16,33 @@ const STATUS_OPTIONS = [
   { value: 'decommissioned', label: 'Decommissioned' },
 ]
 
+const NEW_GROUP = '__new__'
+
 interface AssetFormProps {
   asset?: Asset
+  groups?: AssetGroup[]
+  /** Pre-selects a group, e.g. when adding a new piece from a group's page. */
+  defaultGroupId?: string
 }
 
-export default function AssetForm({ asset }: AssetFormProps) {
+export default function AssetForm({ asset, groups = [], defaultGroupId }: AssetFormProps) {
   const router = useRouter()
   const supabase = createClient()
+  const categories = useAssetCategories()
+  const categoryOptions = [
+    { value: '', label: 'Select category...' },
+    ...categories.map((c) => ({ value: c, label: c })),
+    // Keep an asset's current category selectable even if it was removed in Settings.
+    ...(asset?.category && !categories.includes(asset.category)
+      ? [{ value: asset.category, label: asset.category }]
+      : []),
+  ]
+  const groupOptions = [
+    { value: '', label: 'Not grouped' },
+    ...groups.map((g) => ({ value: g.id, label: g.name })),
+    { value: NEW_GROUP, label: '+ New group...' },
+  ]
+  const [newGroupName, setNewGroupName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const hasFacilitiesData = !!(asset?.power_requirements || asset?.dimensions || asset?.weight || asset?.internet_requirements || asset?.water_requirements || asset?.air_gas_requirements || asset?.ventilation_requirements || asset?.environmental_requirements || asset?.facilities_notes)
@@ -60,6 +70,7 @@ export default function AssetForm({ asset }: AssetFormProps) {
     ventilation_requirements: asset?.ventilation_requirements ?? '',
     environmental_requirements: asset?.environmental_requirements ?? '',
     facilities_notes: asset?.facilities_notes ?? '',
+    group_id: asset?.group_id ?? defaultGroupId ?? '',
   })
 
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -72,8 +83,27 @@ export default function AssetForm({ asset }: AssetFormProps) {
       setError('Name and category are required.')
       return
     }
+    if (form.group_id === NEW_GROUP && !newGroupName.trim()) {
+      setError('Enter a name for the new group.')
+      return
+    }
     setLoading(true)
     setError('')
+
+    let groupId: string | null = form.group_id || null
+    if (form.group_id === NEW_GROUP) {
+      const { data: group, error: groupError } = await supabase
+        .from('asset_groups')
+        .insert({ name: newGroupName.trim() })
+        .select('id')
+        .single()
+      if (groupError || !group) {
+        setError(groupError?.message ?? 'Could not create the group.')
+        setLoading(false)
+        return
+      }
+      groupId = group.id
+    }
 
     const payload = {
       name: form.name,
@@ -97,6 +127,9 @@ export default function AssetForm({ asset }: AssetFormProps) {
       ventilation_requirements: form.ventilation_requirements || null,
       environmental_requirements: form.environmental_requirements || null,
       facilities_notes: form.facilities_notes || null,
+      // Only send group_id when grouping is in play, so saving still works on
+      // a database that hasn't had the asset groups migration applied yet.
+      ...(groupId || asset?.group_id ? { group_id: groupId } : {}),
     }
 
     let result
@@ -112,7 +145,7 @@ export default function AssetForm({ asset }: AssetFormProps) {
       return
     }
 
-    router.push('/assets')
+    router.push(!asset && defaultGroupId && groupId === defaultGroupId ? `/assets/groups/${groupId}` : '/assets')
     router.refresh()
   }
 
@@ -128,7 +161,7 @@ export default function AssetForm({ asset }: AssetFormProps) {
             <Input label="Asset Name *" value={form.name} onChange={set('name')} placeholder="e.g. HPLC System #1" />
           </div>
           <Input label="Asset Tag / ID" value={form.asset_tag} onChange={set('asset_tag')} placeholder="e.g. ASSET-001" />
-          <Select label="Category *" value={form.category} onChange={set('category')} options={CATEGORY_OPTIONS} />
+          <Select label="Category *" value={form.category} onChange={set('category')} options={categoryOptions} />
           <Input label="Manufacturer" value={form.manufacturer} onChange={set('manufacturer')} placeholder="e.g. Agilent" />
           <Input label="Model" value={form.model} onChange={set('model')} placeholder="e.g. 1260 Infinity II" />
           <Input label="Serial Number" value={form.serial_number} onChange={set('serial_number')} placeholder="e.g. DE12345678" />
@@ -137,6 +170,21 @@ export default function AssetForm({ asset }: AssetFormProps) {
           <Input label="Purchase Date" type="date" value={form.purchase_date} onChange={set('purchase_date')} />
           <Input label="Purchase Cost ($)" type="number" value={form.purchase_cost} onChange={set('purchase_cost')} placeholder="0.00" step="0.01" min="0" />
           <Input label="Date Installed" type="date" value={form.date_installed} onChange={set('date_installed')} />
+          <Select
+            label="Group"
+            value={form.group_id}
+            onChange={set('group_id')}
+            options={groupOptions}
+            hint="Bundle pieces that work as one unit, e.g. the modules of an LC stack."
+          />
+          {form.group_id === NEW_GROUP && (
+            <Input
+              label="New Group Name *"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              placeholder="e.g. LC Stack #1"
+            />
+          )}
           <div className="sm:col-span-2">
             <Textarea label="Notes" value={form.notes} onChange={set('notes')} placeholder="Additional notes..." />
           </div>

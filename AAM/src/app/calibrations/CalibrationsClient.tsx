@@ -114,7 +114,7 @@ export default function CalibrationsClient({ calibrations }: CalibrationsClientP
                 {filtered.map((cal) => {
                   const dueBadge = dueStatusBadge(cal.next_due_date)
                   return (
-                    <tr key={cal.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={cal.id} className="hover:bg-blue-50 transition-colors">
                       <td className="px-4 py-3">
                         <p className="text-sm font-medium text-gray-900">{cal.assets?.name ?? '—'}</p>
                         {cal.assets?.asset_tag && (

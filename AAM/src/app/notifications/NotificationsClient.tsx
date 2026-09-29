@@ -186,7 +186,7 @@ export default function NotificationsClient({ rules: initialRules, logs }: Notif
             </p>
           ) : (
             filteredRules.map((rule) => (
-              <div key={rule.id} className="flex items-center justify-between px-6 py-4">
+              <div key={rule.id} className="hover-row flex items-center justify-between px-6 py-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium text-gray-900">{rule.name}</p>
@@ -266,7 +266,7 @@ export default function NotificationsClient({ rules: initialRules, logs }: Notif
             </p>
           ) : (
             filteredLogs.map((log) => (
-              <div key={log.id} className="flex items-center justify-between px-6 py-3">
+              <div key={log.id} className="hover-row flex items-center justify-between px-6 py-3">
                 <div className="flex items-center gap-3">
                   {log.status === 'sent' ? (
                     <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import AppShell from "@/components/layout/AppShell";
 import { createClient } from "@/lib/supabase/server";
+import { getHiddenPages } from "@/lib/permissions";
 
 export const metadata: Metadata = {
   title: "Aera Asset Manager",
@@ -16,11 +17,12 @@ export default async function RootLayout({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const userRole = (user?.user_metadata?.role as string) ?? null
+  const hiddenPages = user ? await getHiddenPages(supabase, userRole) : []
 
   return (
     <html lang="en">
       <body className="font-sans antialiased">
-        <AppShell userRole={userRole}>
+        <AppShell userRole={userRole} hiddenPages={hiddenPages}>
           {children}
         </AppShell>
       </body>

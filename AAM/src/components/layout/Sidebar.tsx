@@ -21,59 +21,64 @@ import {
   DollarSign,
   BarChart3,
   ChevronDown,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { isPathHidden } from '@/lib/permissions'
 
 interface NavItem {
   name: string
   href: string
   icon: React.ElementType
-  adminOnly: boolean
-  children?: { name: string; href: string; adminOnly: boolean }[]
+  children?: { name: string; href: string }[]
 }
 
 const assetNavigation: NavItem[] = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard, adminOnly: false },
-  { name: 'Assets', href: '/assets', icon: Package, adminOnly: false },
-  { name: 'Service Contracts', href: '/contracts', icon: FileText, adminOnly: true },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Assets', href: '/assets', icon: Package },
+  { name: 'Service Contracts', href: '/contracts', icon: FileText },
   {
     name: 'Maintenance',
     href: '/maintenance',
     icon: ClipboardList,
-    adminOnly: false,
     children: [
-      { name: 'Maintenance Plans', href: '/maintenance', adminOnly: false },
-      { name: 'Other Work Orders', href: '/work-orders', adminOnly: false },
+      { name: 'Maintenance Plans', href: '/maintenance' },
+      { name: 'Other Work Orders', href: '/work-orders' },
     ],
   },
-  { name: 'Repairs', href: '/repairs', icon: Wrench, adminOnly: false },
-  { name: 'Downtime', href: '/downtime', icon: Clock, adminOnly: false },
-  { name: 'Notifications', href: '/notifications', icon: Bell, adminOnly: false },
+  { name: 'Repairs', href: '/repairs', icon: Wrench },
+  { name: 'Downtime', href: '/downtime', icon: Clock },
+  { name: 'Notifications', href: '/notifications', icon: Bell },
 ]
 
-const operationsNavigation = [
-  { name: 'Schedule', href: '/schedule', icon: Calendar, adminOnly: false },
-  { name: 'Calibrations', href: '/calibrations', icon: FlaskConical, adminOnly: false },
+const operationsNavigation: NavItem[] = [
+  { name: 'Schedule', href: '/schedule', icon: Calendar },
+  { name: 'Calibrations', href: '/calibrations', icon: FlaskConical },
 ]
 
-const resourcesNavigation = [
-  { name: 'Vendors', href: '/vendors', icon: Building2, adminOnly: false },
-  { name: 'Parts Inventory', href: '/parts', icon: Package2, adminOnly: false },
-  { name: 'Budgets', href: '/budgets', icon: DollarSign, adminOnly: true },
+const resourcesNavigation: NavItem[] = [
+  { name: 'Vendors', href: '/vendors', icon: Building2 },
+  { name: 'Parts Inventory', href: '/parts', icon: Package2 },
+  { name: 'Budgets', href: '/budgets', icon: DollarSign },
 ]
 
-const analyticsNavigation = [
-  { name: 'Reports', href: '/reports', icon: BarChart3, adminOnly: false },
+const analyticsNavigation: NavItem[] = [
+  { name: 'Reports', href: '/reports', icon: BarChart3 },
+]
+
+const adminNavigation: NavItem[] = [
+  { name: 'Settings', href: '/settings', icon: SlidersHorizontal },
 ]
 
 interface SidebarProps {
   onClose?: () => void
   userRole: string | null
+  hiddenPages: string[]
 }
 
-export default function Sidebar({ onClose, userRole }: SidebarProps) {
+export default function Sidebar({ onClose, userRole, hiddenPages }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const isAdmin = userRole === 'admin'
@@ -96,10 +101,9 @@ export default function Sidebar({ onClose, userRole }: SidebarProps) {
   }
 
   function renderNavItem(item: NavItem) {
-    if (item.adminOnly && !isAdmin) return null
-
     if (item.children) {
-      const children = item.children.filter((c) => !c.adminOnly || isAdmin)
+      const children = item.children.filter((c) => !isPathHidden(c.href, hiddenPages))
+      if (children.length === 0) return null
       const isChildActive = children.some((c) => pathname === c.href || pathname.startsWith(`${c.href}/`))
       const isOpen = openMenus.has(item.name) || isChildActive
       return (
@@ -143,6 +147,8 @@ export default function Sidebar({ onClose, userRole }: SidebarProps) {
       )
     }
 
+    if (item.href !== '/' && isPathHidden(item.href, hiddenPages)) return null
+
     const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
     return (
       <Link
@@ -161,6 +167,14 @@ export default function Sidebar({ onClose, userRole }: SidebarProps) {
       </Link>
     )
   }
+
+  const sections: { title: string; items: NavItem[] }[] = [
+    { title: 'Asset Manager', items: assetNavigation },
+    { title: 'Operations', items: operationsNavigation },
+    { title: 'Resources', items: resourcesNavigation },
+    { title: 'Analytics', items: analyticsNavigation },
+    ...(isAdmin ? [{ title: 'Administration', items: adminNavigation }] : []),
+  ]
 
   return (
     <div className="flex h-full w-64 flex-col bg-slate-900">
@@ -185,37 +199,16 @@ export default function Sidebar({ onClose, userRole }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
-        {/* Asset Manager section */}
-        <div>
-          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Asset Manager</p>
-          <div className="space-y-1">
-            {assetNavigation.map(renderNavItem)}
-          </div>
-        </div>
-
-        {/* Operations section */}
-        <div>
-          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Operations</p>
-          <div className="space-y-1">
-            {operationsNavigation.map(renderNavItem)}
-          </div>
-        </div>
-
-        {/* Resources section */}
-        <div>
-          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Resources</p>
-          <div className="space-y-1">
-            {resourcesNavigation.map(renderNavItem)}
-          </div>
-        </div>
-
-        {/* Analytics section */}
-        <div>
-          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Analytics</p>
-          <div className="space-y-1">
-            {analyticsNavigation.map(renderNavItem)}
-          </div>
-        </div>
+        {sections.map((section) => {
+          const items = section.items.map(renderNavItem).filter(Boolean)
+          if (items.length === 0) return null
+          return (
+            <div key={section.title}>
+              <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">{section.title}</p>
+              <div className="space-y-1">{items}</div>
+            </div>
+          )
+        })}
       </nav>
 
       {/* Footer */}

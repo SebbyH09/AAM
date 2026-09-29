@@ -130,7 +130,7 @@ export default function WorkOrdersClient({ workOrders }: WorkOrdersClientProps) 
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map((wo) => (
-                <tr key={wo.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={wo.id} className="hover:bg-blue-50 transition-colors">
                   <td className="px-6 py-4">
                     <p className="text-sm font-medium text-gray-900 max-w-xs truncate">{wo.title}</p>
                     <p className="text-xs text-gray-500">

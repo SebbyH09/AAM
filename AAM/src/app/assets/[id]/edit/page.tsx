@@ -13,14 +13,17 @@ export default async function EditAssetPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: asset } = await supabase.from('assets').select('*').eq('id', id).single()
+  const [{ data: asset }, { data: groups }] = await Promise.all([
+    supabase.from('assets').select('*').eq('id', id).single(),
+    supabase.from('asset_groups').select('*').order('name'),
+  ])
   if (!asset) notFound()
 
   return (
     <div>
       <Header title="Edit Asset" subtitle={asset.name} />
       <div className="p-6">
-        <AssetForm asset={asset} />
+        <AssetForm asset={asset} groups={groups ?? []} />
       </div>
     </div>
   )

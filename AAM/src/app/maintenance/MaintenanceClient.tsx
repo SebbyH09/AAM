@@ -613,7 +613,7 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {planReports.map((r: any) => (
-                          <tr key={r.id} className="hover:bg-gray-50">
+                          <tr key={r.id} className="hover:bg-blue-50">
                             <td className="px-4 py-2 text-sm text-gray-700">{formatDate(r.report_date)}</td>
                             <td className="px-4 py-2 text-sm text-gray-700">{r.technician || '—'}</td>
                             <td className="px-4 py-2 text-sm text-gray-700 max-w-[200px] truncate">{r.summary || r.file_name || '—'}</td>

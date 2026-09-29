@@ -164,7 +164,7 @@ export default async function DashboardPage() {
                 expiringContractsList.map((contract: any) => {
                   const badge = dueStatusBadge(contract.end_date)
                   return (
-                    <div key={contract.id} className="flex items-center justify-between px-6 py-3">
+                    <div key={contract.id} className="hover-row flex items-center justify-between px-6 py-3">
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{contract.vendor_name}</p>
                         <p className="text-xs text-gray-500">
@@ -196,7 +196,7 @@ export default async function DashboardPage() {
             <div className="divide-y divide-gray-100">
               {openRepairsList && openRepairsList.length > 0 ? (
                 openRepairsList.map((repair: any) => (
-                  <div key={repair.id} className="flex items-center justify-between px-6 py-3">
+                  <div key={repair.id} className="hover-row flex items-center justify-between px-6 py-3">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{repair.description}</p>
                       <p className="text-xs text-gray-500">
@@ -229,7 +229,7 @@ export default async function DashboardPage() {
             <div className="divide-y divide-gray-100">
               {activeDowntime && activeDowntime.length > 0 ? (
                 activeDowntime.map((event: any) => (
-                  <div key={event.id} className="flex items-center justify-between px-6 py-3">
+                  <div key={event.id} className="hover-row flex items-center justify-between px-6 py-3">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
                         {event.assets?.name ?? 'Unknown Asset'}
@@ -264,7 +264,7 @@ export default async function DashboardPage() {
                 calibrationsDueList.map((cal: any) => {
                   const badge = dueStatusBadge(cal.next_due_date)
                   return (
-                    <div key={cal.id} className="flex items-center justify-between px-6 py-3">
+                    <div key={cal.id} className="hover-row flex items-center justify-between px-6 py-3">
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">
                           {cal.assets?.name ?? 'Unknown Asset'}

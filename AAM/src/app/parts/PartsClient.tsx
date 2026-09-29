@@ -138,7 +138,7 @@ export default function PartsClient({ parts, vendors }: PartsClientProps) {
                 {filtered.map((part) => {
                   const low = isLowStock(part)
                   return (
-                    <tr key={part.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={part.id} className="hover:bg-blue-50 transition-colors">
                       <td className="px-4 py-3 text-sm text-gray-600">{part.part_number ?? '—'}</td>
                       <td className="px-4 py-3">
                         <p className="text-sm font-medium text-gray-900">{part.name}</p>

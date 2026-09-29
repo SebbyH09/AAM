@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge } from '@/lib/utils'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Edit, Plus, FileText, Wrench, ClipboardList, Clock, Zap, Ruler, Wifi, Droplets, Wind, Thermometer, Tag, Factory, Box, Hash } from 'lucide-react'
+import { Edit, Plus, FileText, Wrench, ClipboardList, Clock, Zap, Ruler, Wifi, Droplets, Wind, Thermometer, Tag, Factory, Box, Hash, Layers, ChevronRight } from 'lucide-react'
 import DeleteAssetButton from './DeleteAssetButton'
 import DeactivateAssetButton from './DeactivateAssetButton'
 import AssetDocumentsSection from './AssetDocumentsSection'
@@ -37,6 +37,13 @@ export default async function AssetDetailPage({ params }: PageProps) {
   ])
 
   if (!asset) notFound()
+
+  const [{ data: group }, { data: groupMembers }] = asset.group_id
+    ? await Promise.all([
+        supabase.from('asset_groups').select('*').eq('id', asset.group_id).single(),
+        supabase.from('assets').select('id, name, asset_tag, model, status').eq('group_id', asset.group_id).neq('id', id).order('name'),
+      ])
+    : [{ data: null }, { data: null }]
 
   const totalDowntimeHours = downtime?.reduce((sum, d) => sum + (d.duration_hours ?? 0), 0) ?? 0
   const totalRepairCost = repairs?.reduce((sum, r) => sum + (r.total_cost ?? 0), 0) ?? 0
@@ -85,6 +92,44 @@ export default async function AssetDetailPage({ params }: PageProps) {
             ))}
           </div>
         </section>
+
+        {/* Group membership */}
+        {group && (
+          <section className="rounded-xl border border-blue-200 bg-blue-50/40 shadow-sm">
+            <div className="flex flex-col gap-2 border-b border-blue-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="h-5 w-5 text-blue-600" />
+                <p className="text-sm text-gray-600">
+                  Part of{' '}
+                  <Link href={`/assets/groups/${group.id}`} className="font-semibold text-blue-700 hover:underline">
+                    {group.name}
+                  </Link>
+                </p>
+              </div>
+              <Link href={`/assets/groups/${group.id}`} className="text-sm text-blue-600 hover:text-blue-800">
+                View group →
+              </Link>
+            </div>
+            {groupMembers && groupMembers.length > 0 ? (
+              <div className="divide-y divide-blue-100">
+                {groupMembers.map((m) => (
+                  <Link key={m.id} href={`/assets/${m.id}`} className="hover-row flex items-center justify-between gap-3 px-6 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{m.name}</p>
+                      <p className="text-xs text-gray-500">{[m.asset_tag, m.model].filter(Boolean).join(' • ')}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className={statusColor(m.status)}>{m.status}</Badge>
+                      <ChevronRight className="h-4 w-4 text-gray-400" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="px-6 py-3 text-sm text-gray-400">No other assets in this group yet.</p>
+            )}
+          </section>
+        )}
 
         {/* Asset Info */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -222,7 +267,7 @@ export default async function AssetDetailPage({ params }: PageProps) {
                 contracts.map((c) => {
                   const badge = dueStatusBadge(c.end_date)
                   return (
-                    <div key={c.id} className="px-6 py-3">
+                    <div key={c.id} className="hover-row px-6 py-3">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-gray-900">{c.vendor_name}</p>
                         <div className="flex gap-2">
@@ -274,7 +319,7 @@ export default async function AssetDetailPage({ params }: PageProps) {
                       ? { label: 'Completed', color: 'bg-green-100 text-green-800' }
                       : { label: 'Inactive', color: 'bg-gray-100 text-gray-600' }
                   return (
-                    <div key={p.id} className="px-6 py-3">
+                    <div key={p.id} className="hover-row px-6 py-3">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-gray-900">{p.name}</p>
                         <div className="flex gap-2">
@@ -315,7 +360,7 @@ export default async function AssetDetailPage({ params }: PageProps) {
             <div className="divide-y divide-gray-100">
               {repairs && repairs.length > 0 ? (
                 repairs.slice(0, 5).map((r) => (
-                  <div key={r.id} className="px-6 py-3">
+                  <div key={r.id} className="hover-row px-6 py-3">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-gray-900 truncate pr-2">{r.description}</p>
                       <Badge className={statusColor(r.status)}>{r.status.replace('_', ' ')}</Badge>
@@ -351,7 +396,7 @@ export default async function AssetDetailPage({ params }: PageProps) {
             <div className="divide-y divide-gray-100">
               {records && records.length > 0 ? (
                 records.slice(0, 5).map((r) => (
-                  <div key={r.id} className="px-6 py-3">
+                  <div key={r.id} className="hover-row px-6 py-3">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-gray-900">{r.type}</p>
                       <Badge className={statusColor(r.status)}>{r.status.replace('_', ' ')}</Badge>
