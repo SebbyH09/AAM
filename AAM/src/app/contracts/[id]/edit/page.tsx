@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Header from '@/components/layout/Header'
 import ContractForm from '../../ContractForm'
 import { notFound } from 'next/navigation'
-import { ASSET_PICKER_COLUMNS } from '@/lib/assetPicker'
+import { ASSET_GROUP_PICKER_COLUMNS, ASSET_PICKER_COLUMNS } from '@/lib/assetPicker'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,10 +14,11 @@ export default async function EditContractPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data: contract }, { data: assets }, { data: linkedAssets }] = await Promise.all([
+  const [{ data: contract }, { data: assets }, { data: linkedAssets }, { data: groups }] = await Promise.all([
     supabase.from('service_contracts').select('*').eq('id', id).single(),
     supabase.from('assets').select(ASSET_PICKER_COLUMNS).order('name'),
     supabase.from('service_contract_assets').select('asset_id').eq('service_contract_id', id),
+    supabase.from('asset_groups').select(ASSET_GROUP_PICKER_COLUMNS).order('name'),
   ])
 
   if (!contract) notFound()
@@ -31,7 +32,7 @@ export default async function EditContractPage({ params }: PageProps) {
     <div>
       <Header title="Edit Contract" subtitle={contract.vendor_name} />
       <div className="p-6">
-        <ContractForm assets={assets ?? []} contract={contract} defaultAssetIds={linkedAssetIds} />
+        <ContractForm assets={assets ?? []} groups={groups ?? []} contract={contract} defaultAssetIds={linkedAssetIds} />
       </div>
     </div>
   )

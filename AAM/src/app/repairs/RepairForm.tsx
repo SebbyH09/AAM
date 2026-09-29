@@ -4,14 +4,17 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input, Select, Textarea } from '@/components/ui/Input'
-import { AssetPicker, PickerAsset } from '@/components/AssetPicker'
+import { AssetPicker, PickerAsset, PickerGroup } from '@/components/AssetPicker'
+import { groupValue, parseGroupValue, recordTargets, splitCost } from '@/lib/assetPicker'
 import { Button } from '@/components/ui/Button'
 import { Repair } from '@/types/database'
 
 interface RepairFormProps {
   assets: PickerAsset[]
+  groups?: PickerGroup[]
   repair?: Repair
   defaultAssetId?: string
+  defaultGroupId?: string
 }
 
 const STATUS_OPTIONS = [
@@ -29,7 +32,7 @@ const PRIORITY_OPTIONS = [
   { value: 'critical', label: 'Critical' },
 ]
 
-export default function RepairForm({ assets, repair, defaultAssetId }: RepairFormProps) {
+export default function RepairForm({ assets, groups, repair, defaultAssetId, defaultGroupId }: RepairFormProps) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
@@ -38,7 +41,7 @@ export default function RepairForm({ assets, repair, defaultAssetId }: RepairFor
   const today = new Date().toISOString().split('T')[0]
 
   const [form, setForm] = useState({
-    asset_id: repair?.asset_id ?? defaultAssetId ?? '',
+    asset_id: repair?.asset_id ?? defaultAssetId ?? (defaultGroupId ? groupValue(defaultGroupId) : ''),
     repair_number: repair?.repair_number ?? '',
     reported_by: repair?.reported_by ?? '',
     reported_date: repair?.reported_date ?? today,
@@ -65,6 +68,11 @@ export default function RepairForm({ assets, repair, defaultAssetId }: RepairFor
     e.preventDefault()
     if (!form.reported_by || !form.description || !form.reported_date) {
       setError('Reported by, date, and description are required.')
+      return
+    }
+    const targets = recordTargets(form.asset_id, assets)
+    if (targets.length === 0) {
+      setError('That group has no assets to log a repair on.')
       return
     }
     setLoading(true)
@@ -98,7 +106,18 @@ export default function RepairForm({ assets, repair, defaultAssetId }: RepairFor
     if (repair) {
       result = await supabase.from('repairs').update(payload).eq('id', repair.id)
     } else {
-      result = await supabase.from('repairs').insert(payload)
+      // A group repair lands on every unit; costs are split so totals stay true.
+      const parts = splitCost(partsCost, targets.length)
+      const labor = splitCost(laborCost, targets.length)
+      result = await supabase.from('repairs').insert(
+        targets.map((assetId, i) => ({
+          ...payload,
+          asset_id: assetId,
+          parts_cost: parts[i],
+          labor_cost: labor[i],
+          total_cost: (parts[i] ?? 0) + (labor[i] ?? 0) || null,
+        }))
+      )
     }
 
     if (result.error) {
@@ -127,6 +146,8 @@ export default function RepairForm({ assets, repair, defaultAssetId }: RepairFor
               onChange={(assetId) => setForm((prev) => ({ ...prev, asset_id: assetId }))}
               placeholder="No asset"
               modalTitle="Link an asset to this repair"
+              groups={repair ? undefined : groups}
+              hint={parseGroupValue(form.asset_id) ? 'Parts and labor costs are split evenly across the group.' : undefined}
             />
           </div>
           <Input label="Repair Number" value={form.repair_number} onChange={set('repair_number')} placeholder="e.g. REP-2024-001" />

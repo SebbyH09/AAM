@@ -301,7 +301,11 @@ export default async function AssetDetailPage({ params }: PageProps) {
                 <h2 className="font-semibold text-gray-900">Maintenance Plans</h2>
               </div>
               <div className="flex items-center gap-4">
-                <AddOneTimePmButton assetId={id} assetName={asset.name} />
+                <AddOneTimePmButton
+                  assetId={id}
+                  assetName={asset.name}
+                  group={group ? { name: group.name, assetIds: [id, ...(groupMembers ?? []).map((m) => m.id)] } : undefined}
+                />
                 <Link
                   href={`/maintenance/new?asset_id=${id}`}
                   className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"

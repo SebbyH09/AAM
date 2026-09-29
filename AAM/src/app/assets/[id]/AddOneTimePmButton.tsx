@@ -7,10 +7,15 @@ import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { CalendarPlus } from 'lucide-react'
+import { splitCost } from '@/lib/assetPicker'
 
 interface AddOneTimePmButtonProps {
-  assetId: string
+  /** Omit to always schedule on the whole group (e.g. from the group page). */
+  assetId?: string
   assetName: string
+  /** The asset's group, offered as "apply to every unit". */
+  group?: { name: string; assetIds: string[] }
+  triggerClassName?: string
 }
 
 const PRIORITY_OPTIONS = [
@@ -32,16 +37,20 @@ function emptyForm() {
     already_completed: false,
     performed_by: '',
     findings: '',
+    apply_to_group: false,
   }
 }
 
-export default function AddOneTimePmButton({ assetId, assetName }: AddOneTimePmButtonProps) {
+export default function AddOneTimePmButton({ assetId, assetName, group, triggerClassName }: AddOneTimePmButtonProps) {
   const router = useRouter()
   const supabase = createClient()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState(emptyForm)
+
+  const onGroup = Boolean(group && (!assetId || form.apply_to_group))
+  const targetIds = onGroup ? group!.assetIds : assetId ? [assetId] : []
 
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }))
@@ -63,13 +72,18 @@ export default function AddOneTimePmButton({ assetId, assetName }: AddOneTimePmB
       setError('Performed by is required when logging a completed PM.')
       return
     }
+    if (targetIds.length === 0) {
+      setError('There are no assets to schedule this PM on.')
+      return
+    }
     setLoading(true)
     setError('')
 
-    const { data: plan, error: planError } = await supabase
+    const costs = splitCost(form.estimated_cost ? parseFloat(form.estimated_cost) : null, targetIds.length)
+    const { data: plans, error: planError } = await supabase
       .from('maintenance_plans')
-      .insert({
-        asset_id: assetId,
+      .insert(targetIds.map((targetId, i) => ({
+        asset_id: targetId,
         name: form.name,
         description: form.description || null,
         frequency: 'one_time',
@@ -79,19 +93,18 @@ export default function AddOneTimePmButton({ assetId, assetName }: AddOneTimePmB
         assigned_to: form.assigned_to || null,
         priority: form.priority,
         estimated_duration_hours: form.estimated_duration_hours ? parseFloat(form.estimated_duration_hours) : null,
-        estimated_cost: form.estimated_cost ? parseFloat(form.estimated_cost) : null,
+        estimated_cost: costs[i],
         parts: null,
         // A completed one-time PM has nothing left to schedule
         is_active: !form.already_completed,
-      })
-      .select('id')
-      .single()
+      })))
+      .select('id, asset_id, estimated_cost')
 
-    if (planError) { setError(planError.message); setLoading(false); return }
+    if (planError || !plans) { setError(planError?.message ?? 'Failed to create PM'); setLoading(false); return }
 
     if (form.already_completed) {
-      const { error: recordError } = await supabase.from('maintenance_records').insert({
-        asset_id: assetId,
+      const { error: recordError } = await supabase.from('maintenance_records').insert(plans.map((plan) => ({
+        asset_id: plan.asset_id,
         maintenance_plan_id: plan.id,
         performed_by: form.performed_by,
         performed_date: form.due_date,
@@ -100,11 +113,11 @@ export default function AddOneTimePmButton({ assetId, assetName }: AddOneTimePmB
         description: form.description || `Completed: ${form.name}`,
         findings: form.findings || null,
         parts_replaced: null,
-        cost: form.estimated_cost ? parseFloat(form.estimated_cost) : null,
-        status: 'completed',
+        cost: plan.estimated_cost,
+        status: 'completed' as const,
         next_maintenance_date: null,
         notes: null,
-      })
+      })))
       if (recordError) { setError(recordError.message); setLoading(false); return }
     }
 
@@ -118,9 +131,9 @@ export default function AddOneTimePmButton({ assetId, assetName }: AddOneTimePmB
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+        className={triggerClassName ?? 'inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800'}
       >
-        <CalendarPlus className="h-4 w-4" /> One-Time PM
+        <CalendarPlus className={triggerClassName ? 'h-4 w-4 text-green-600' : 'h-4 w-4'} /> One-Time PM
       </button>
 
       <Modal open={open} onClose={close} title="Add One-Time PM" size="lg">
@@ -131,9 +144,28 @@ export default function AddOneTimePmButton({ assetId, assetName }: AddOneTimePmB
 
           <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
             <p className="text-sm text-blue-700">
-              <strong>Asset:</strong> {assetName} • This PM will not repeat.
+              {onGroup ? (
+                <><strong>Group:</strong> {group!.name} • A PM will be added to each of its {targetIds.length} assets.</>
+              ) : (
+                <><strong>Asset:</strong> {assetName}</>
+              )}{' '}
+              • This PM will not repeat.
             </p>
           </div>
+
+          {assetId && group && group.assetIds.length > 1 && (
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.apply_to_group}
+                onChange={(e) => setForm((prev) => ({ ...prev, apply_to_group: e.target.checked }))}
+                className="h-4 w-4 rounded text-blue-600"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Apply to all {group.assetIds.length} assets in {group.name}
+              </span>
+            </label>
+          )}
 
           <label className="flex items-center gap-3 cursor-pointer">
             <input

@@ -1,19 +1,20 @@
 import { createClient } from '@/lib/supabase/server'
 import Header from '@/components/layout/Header'
 import DowntimeClient from './DowntimeClient'
-import { ASSET_PICKER_COLUMNS } from '@/lib/assetPicker'
+import { ASSET_GROUP_PICKER_COLUMNS, ASSET_PICKER_COLUMNS } from '@/lib/assetPicker'
 
 export const dynamic = 'force-dynamic'
 
 export default async function DowntimePage() {
   const supabase = await createClient()
 
-  const [{ data: events }, { data: assets }] = await Promise.all([
+  const [{ data: events }, { data: assets }, { data: groups }] = await Promise.all([
     supabase
       .from('downtime_events')
       .select('*, assets(name, asset_tag, serial_number, model)')
       .order('start_time', { ascending: false }),
     supabase.from('assets').select(ASSET_PICKER_COLUMNS).order('name'),
+    supabase.from('asset_groups').select(ASSET_GROUP_PICKER_COLUMNS).order('name'),
   ])
 
   // Compute total downtime by asset
@@ -31,7 +32,7 @@ export default async function DowntimePage() {
         subtitle="Monitor and analyze equipment downtime events"
       />
       <div className="p-6">
-        <DowntimeClient events={events ?? []} assets={assets ?? []} />
+        <DowntimeClient events={events ?? []} assets={assets ?? []} groups={groups ?? []} />
       </div>
     </div>
   )

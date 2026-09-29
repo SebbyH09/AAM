@@ -5,11 +5,15 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
-import { AssetPicker, PickerAsset } from '@/components/AssetPicker'
+import { AssetPicker, PickerAsset, PickerGroup } from '@/components/AssetPicker'
+import { parseGroupValue, resolveAssetIds, splitCost } from '@/lib/assetPicker'
 import { Button } from '@/components/ui/Button'
 
 interface LogDowntimeModalProps {
   assets: PickerAsset[]
+  groups?: PickerGroup[]
+  /** Pre-selected picker value: an asset id or `groupValue(id)`. */
+  defaultValue?: string
   onClose: () => void
 }
 
@@ -22,7 +26,7 @@ const REASON_OPTIONS = [
   { value: 'other', label: 'Other' },
 ]
 
-export default function LogDowntimeModal({ assets, onClose }: LogDowntimeModalProps) {
+export default function LogDowntimeModal({ assets, groups, defaultValue, onClose }: LogDowntimeModalProps) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
@@ -31,7 +35,7 @@ export default function LogDowntimeModal({ assets, onClose }: LogDowntimeModalPr
   const now = new Date().toISOString().slice(0, 16)
 
   const [form, setForm] = useState({
-    asset_id: '',
+    asset_id: defaultValue ?? '',
     reason: 'breakdown',
     start_time: now,
     end_time: '',
@@ -48,6 +52,11 @@ export default function LogDowntimeModal({ assets, onClose }: LogDowntimeModalPr
     e.preventDefault()
     if (!form.asset_id || !form.start_time) {
       setError('Asset and start time are required.')
+      return
+    }
+    const assetIds = resolveAssetIds(form.asset_id, assets)
+    if (assetIds.length === 0) {
+      setError('That group has no assets to log downtime on.')
       return
     }
     setLoading(true)
@@ -71,12 +80,16 @@ export default function LogDowntimeModal({ assets, onClose }: LogDowntimeModalPr
       cost_impact: form.cost_impact ? parseFloat(form.cost_impact) : null,
     }
 
-    const { error } = await supabase.from('downtime_events').insert(payload)
+    // A group going down logs an event on every unit; cost impact is split.
+    const costs = splitCost(payload.cost_impact, assetIds.length)
+    const { error } = await supabase
+      .from('downtime_events')
+      .insert(assetIds.map((assetId, i) => ({ ...payload, asset_id: assetId, cost_impact: costs[i] })))
     if (error) { setError(error.message); setLoading(false); return }
 
     // Update asset status if still active downtime
     if (!form.end_time) {
-      await supabase.from('assets').update({ status: 'repair' }).eq('id', form.asset_id)
+      await supabase.from('assets').update({ status: 'repair' }).in('id', assetIds)
     }
 
     router.refresh()
@@ -99,6 +112,8 @@ export default function LogDowntimeModal({ assets, onClose }: LogDowntimeModalPr
               onChange={(assetId) => setForm((prev) => ({ ...prev, asset_id: assetId }))}
               placeholder="Search for the asset that went down..."
               modalTitle="Link an asset to this downtime event"
+              groups={groups}
+              hint={parseGroupValue(form.asset_id) ? 'Cost impact is split evenly across the group.' : undefined}
             />
           </div>
           <Select label="Reason" value={form.reason} onChange={set('reason')} options={REASON_OPTIONS} />

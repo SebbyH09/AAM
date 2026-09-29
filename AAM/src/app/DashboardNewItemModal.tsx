@@ -7,8 +7,8 @@ import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Plus, CheckCircle2 } from 'lucide-react'
-import { AssetPicker, PickerAsset } from '@/components/AssetPicker'
-import { ASSET_PICKER_COLUMNS } from '@/lib/assetPicker'
+import { AssetPicker, PickerAsset, PickerGroup } from '@/components/AssetPicker'
+import { ASSET_GROUP_PICKER_COLUMNS, ASSET_PICKER_COLUMNS, recordTargets, resolveAssetIds, splitCost } from '@/lib/assetPicker'
 import { useAssetCategories } from '@/hooks/useAssetCategories'
 
 type ItemType =
@@ -171,6 +171,7 @@ export default function DashboardNewItemModal() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [assets, setAssets] = useState<PickerAsset[]>([])
+  const [groups, setGroups] = useState<PickerGroup[]>([])
 
   // form states per type
   const [assetForm, setAssetForm] = useState(defaultAssetForm())
@@ -186,6 +187,9 @@ export default function DashboardNewItemModal() {
     if (open) {
       supabase.from('assets').select(ASSET_PICKER_COLUMNS).order('name').then(({ data }) => {
         if (data) setAssets(data)
+      })
+      supabase.from('asset_groups').select(ASSET_GROUP_PICKER_COLUMNS).order('name').then(({ data }) => {
+        if (data) setGroups(data)
       })
     }
   }, [open])
@@ -281,8 +285,9 @@ export default function DashboardNewItemModal() {
           setLoading(false)
           return
         }
+        const contractAssetIds = resolveAssetIds(contractForm.asset_id, assets)
         const payload: any = {
-          asset_id: contractForm.asset_id || null,
+          asset_id: contractAssetIds[0] ?? null,
           vendor_name: contractForm.vendor_name,
           contract_number: contractForm.contract_number || null,
           vendor_contact: contractForm.vendor_contact || null,
@@ -300,12 +305,12 @@ export default function DashboardNewItemModal() {
         }
         const { data, error } = await supabase.from('service_contracts').insert(payload).select('id').single()
         if (error) throw error
-        // Link asset to junction table if selected
-        if (data && contractForm.asset_id) {
-          await supabase.from('service_contract_assets').insert({
-            service_contract_id: data.id,
-            asset_id: contractForm.asset_id,
-          })
+        // Link the asset (or every asset in the picked group) to the junction table
+        if (data && contractAssetIds.length > 0) {
+          const { error: linkError } = await supabase.from('service_contract_assets').insert(
+            contractAssetIds.map((assetId) => ({ service_contract_id: data.id, asset_id: assetId }))
+          )
+          if (linkError) throw linkError
         }
 
       } else if (itemType === 'maintenance_plan') {
@@ -314,8 +319,18 @@ export default function DashboardNewItemModal() {
           setLoading(false)
           return
         }
-        const { error } = await supabase.from('maintenance_plans').insert({
-          asset_id: maintenanceForm.asset_id || null,
+        const planTargets = recordTargets(maintenanceForm.asset_id, assets)
+        if (planTargets.length === 0) {
+          setError('That group has no assets to schedule.')
+          setLoading(false)
+          return
+        }
+        const planCosts = splitCost(
+          maintenanceForm.estimated_cost ? parseFloat(maintenanceForm.estimated_cost) : null,
+          planTargets.length
+        )
+        const { error } = await supabase.from('maintenance_plans').insert(planTargets.map((assetId, i) => ({
+          asset_id: assetId,
           name: maintenanceForm.name,
           description: maintenanceForm.description || null,
           frequency: maintenanceForm.frequency,
@@ -323,9 +338,9 @@ export default function DashboardNewItemModal() {
           priority: maintenanceForm.priority,
           assigned_to: maintenanceForm.assigned_to || null,
           estimated_duration_hours: maintenanceForm.estimated_duration_hours ? parseFloat(maintenanceForm.estimated_duration_hours) : null,
-          estimated_cost: maintenanceForm.estimated_cost ? parseFloat(maintenanceForm.estimated_cost) : null,
+          estimated_cost: planCosts[i],
           is_active: true,
-        })
+        })))
         if (error) throw error
 
       } else if (itemType === 'repair') {
@@ -334,8 +349,14 @@ export default function DashboardNewItemModal() {
           setLoading(false)
           return
         }
-        const { error } = await supabase.from('repairs').insert({
-          asset_id: repairForm.asset_id || null,
+        const repairTargets = recordTargets(repairForm.asset_id, assets)
+        if (repairTargets.length === 0) {
+          setError('That group has no assets to log a repair on.')
+          setLoading(false)
+          return
+        }
+        const { error } = await supabase.from('repairs').insert(repairTargets.map((assetId) => ({
+          asset_id: assetId,
           repair_number: repairForm.repair_number || null,
           reported_by: repairForm.reported_by,
           reported_date: repairForm.reported_date,
@@ -345,7 +366,7 @@ export default function DashboardNewItemModal() {
           assigned_to: repairForm.assigned_to || null,
           vendor: repairForm.vendor || null,
           notes: repairForm.notes || null,
-        })
+        })))
         if (error) throw error
 
       } else if (itemType === 'part') {
@@ -391,8 +412,14 @@ export default function DashboardNewItemModal() {
           setLoading(false)
           return
         }
-        const { error } = await supabase.from('calibration_records').insert({
-          asset_id: calibrationForm.asset_id,
+        const calibrationTargets = resolveAssetIds(calibrationForm.asset_id, assets)
+        if (calibrationTargets.length === 0) {
+          setError('That group has no assets to calibrate.')
+          setLoading(false)
+          return
+        }
+        const { error } = await supabase.from('calibration_records').insert(calibrationTargets.map((assetId) => ({
+          asset_id: assetId,
           calibration_date: calibrationForm.calibration_date,
           next_due_date: calibrationForm.next_due_date,
           performed_by: calibrationForm.performed_by,
@@ -400,7 +427,7 @@ export default function DashboardNewItemModal() {
           calibration_standard: calibrationForm.calibration_standard || null,
           certificate_number: calibrationForm.certificate_number || null,
           notes: calibrationForm.notes || null,
-        })
+        })))
         if (error) throw error
 
       } else if (itemType === 'budget') {
@@ -507,6 +534,7 @@ export default function DashboardNewItemModal() {
                     onChange={(assetId) => setContractForm((p) => ({ ...p, asset_id: assetId }))}
                     placeholder="No asset"
                     modalTitle="Link an asset to this contract"
+                    groups={groups}
                   />
                 </div>
                 <Input label="Vendor Name *" value={contractForm.vendor_name} onChange={setC('vendor_name')} placeholder="e.g. Agilent Technologies" />
@@ -541,6 +569,7 @@ export default function DashboardNewItemModal() {
                     onChange={(assetId) => setMaintenanceForm((p) => ({ ...p, asset_id: assetId }))}
                     placeholder="No asset"
                     modalTitle="Link an asset to this maintenance plan"
+                    groups={groups}
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -569,6 +598,7 @@ export default function DashboardNewItemModal() {
                     onChange={(assetId) => setRepairForm((p) => ({ ...p, asset_id: assetId }))}
                     placeholder="No asset"
                     modalTitle="Link an asset to this repair"
+                    groups={groups}
                   />
                 </div>
                 <Input label="Repair Number" value={repairForm.repair_number} onChange={setR('repair_number')} placeholder="e.g. REP-2024-001" />
@@ -641,6 +671,7 @@ export default function DashboardNewItemModal() {
                     onChange={(assetId) => setCalibrationForm((p) => ({ ...p, asset_id: assetId }))}
                     placeholder="Search for the calibrated asset..."
                     modalTitle="Link an asset to this calibration"
+                    groups={groups}
                   />
                 </div>
                 <Input label="Calibration Date *" type="date" value={calibrationForm.calibration_date} onChange={setK('calibration_date')} />
