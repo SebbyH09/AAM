@@ -8,10 +8,10 @@ export const dynamic = 'force-dynamic'
 export default async function AssetsPage() {
   const supabase = await createClient()
 
-  const { data: assets, error } = await supabase
-    .from('assets')
-    .select('*')
-    .order('name')
+  const [{ data: assets }, { data: groups }] = await Promise.all([
+    supabase.from('assets').select('*').order('name'),
+    supabase.from('asset_groups').select('*').order('name'),
+  ])
 
   return (
     <div>
@@ -22,7 +22,7 @@ export default async function AssetsPage() {
       />
 
       <div className="p-6">
-        <AssetsClient assets={assets ?? []} />
+        <AssetsClient assets={assets ?? []} groups={groups ?? []} />
       </div>
     </div>
   )

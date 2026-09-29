@@ -344,7 +344,7 @@ export default function BudgetsClient({ budgets, spendingRecords }: BudgetsClien
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
                 {filtered.map((budget) => (
-                  <tr key={budget.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={budget.id} className="hover:bg-blue-50 transition-colors">
                     <td className="px-6 py-4">
                       <p className="text-sm font-medium text-gray-900">{budget.name}</p>
                     </td>
@@ -497,7 +497,7 @@ export default function BudgetsClient({ budgets, spendingRecords }: BudgetsClien
                       .map((record) => {
                         const catMeta = SPENDING_CATEGORIES.find((c) => c.key === record.category)
                         return (
-                          <tr key={record.id} className="hover:bg-gray-50">
+                          <tr key={record.id} className="hover:bg-blue-50">
                             <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(record.date)}</td>
                             <td className="px-4 py-3 text-gray-800 max-w-xs truncate">{record.description}</td>
                             <td className="px-4 py-3 text-gray-600">{record.asset_name ?? '—'}</td>

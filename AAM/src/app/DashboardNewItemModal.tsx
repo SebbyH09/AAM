@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { Plus, CheckCircle2 } from 'lucide-react'
 import { AssetPicker, PickerAsset } from '@/components/AssetPicker'
 import { ASSET_PICKER_COLUMNS } from '@/lib/assetPicker'
+import { useAssetCategories } from '@/hooks/useAssetCategories'
 
 type ItemType =
   | ''
@@ -33,17 +34,6 @@ const ITEM_TYPE_OPTIONS = [
   { value: 'vendor', label: 'Vendor' },
   { value: 'calibration', label: 'Calibration Record' },
   { value: 'budget', label: 'Budget' },
-]
-
-const ASSET_CATEGORY_OPTIONS = [
-  { value: '', label: 'Select category...' },
-  { value: 'Analytical', label: 'Analytical' },
-  { value: 'Lab Equipment', label: 'Lab Equipment' },
-  { value: 'HVAC', label: 'HVAC' },
-  { value: 'IT/Network', label: 'IT/Network' },
-  { value: 'Electrical', label: 'Electrical' },
-  { value: 'Mechanical', label: 'Mechanical' },
-  { value: 'Other', label: 'Other' },
 ]
 
 const ASSET_STATUS_OPTIONS = [
@@ -167,6 +157,11 @@ function defaultBudgetForm() {
 }
 
 export default function DashboardNewItemModal() {
+  const assetCategories = useAssetCategories()
+  const assetCategoryOptions = [
+    { value: '', label: 'Select category...' },
+    ...assetCategories.map((c) => ({ value: c, label: c })),
+  ]
   const router = useRouter()
   const supabase = createClient()
 
@@ -487,7 +482,7 @@ export default function DashboardNewItemModal() {
                   <Input label="Asset Name *" value={assetForm.name} onChange={setA('name')} placeholder="e.g. HPLC System #1" />
                 </div>
                 <Input label="Asset Tag / ID" value={assetForm.asset_tag} onChange={setA('asset_tag')} placeholder="e.g. ASSET-001" />
-                <Select label="Category *" value={assetForm.category} onChange={setA('category')} options={ASSET_CATEGORY_OPTIONS} />
+                <Select label="Category *" value={assetForm.category} onChange={setA('category')} options={assetCategoryOptions} />
                 <Input label="Manufacturer" value={assetForm.manufacturer} onChange={setA('manufacturer')} placeholder="e.g. Agilent" />
                 <Input label="Model" value={assetForm.model} onChange={setA('model')} placeholder="e.g. 1260 Infinity II" />
                 <Input label="Serial Number" value={assetForm.serial_number} onChange={setA('serial_number')} placeholder="e.g. DE12345678" />

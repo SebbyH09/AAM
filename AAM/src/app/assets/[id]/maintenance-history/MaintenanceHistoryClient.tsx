@@ -172,7 +172,7 @@ export default function MaintenanceHistoryClient({ records, plans, assetName }: 
                 {/* Collapsed Row */}
                 <button
                   onClick={() => setExpandedId(isExpanded ? null : record.id)}
-                  className="w-full text-left px-6 py-4 hover:bg-gray-50 transition-colors"
+                  className="w-full text-left px-6 py-4 hover-row"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 min-w-0">

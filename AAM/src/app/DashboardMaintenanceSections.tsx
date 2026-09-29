@@ -173,7 +173,7 @@ export default function DashboardMaintenanceSections() {
             dueMaintenance.map((plan) => {
               const badge = dueStatusBadge(plan.next_due_date)
               return (
-                <div key={plan.id} className="flex items-center justify-between px-6 py-3">
+                <div key={plan.id} className="hover-row flex items-center justify-between px-6 py-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{plan.name}</p>
                     <p className="text-xs text-gray-500">{plan.assets?.name ?? 'No asset'}</p>
@@ -217,7 +217,7 @@ export default function DashboardMaintenanceSections() {
             upcomingPMs.map((contract) => {
               const badge = dueStatusBadge(contract.nextPmDate)
               return (
-                <div key={contract.id} className="flex items-center justify-between px-6 py-3">
+                <div key={contract.id} className="hover-row flex items-center justify-between px-6 py-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
                       <Wrench className="inline h-3.5 w-3.5 mr-1 text-purple-500" />

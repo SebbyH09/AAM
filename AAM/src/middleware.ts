@@ -1,8 +1,9 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { ADMIN_ONLY_PAGES, CONFIGURABLE_PAGES, getHiddenPages, isPathHidden } from '@/lib/permissions'
 
 const publicRoutes = ['/login', '/auth/callback']
-const adminOnlyRoutes = ['/contracts', '/budgets']
+const restrictablePages = [...CONFIGURABLE_PAGES.map((p) => p.href), ...ADMIN_ONLY_PAGES]
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -55,10 +56,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Enforce admin-only routes
-  if (user) {
-    const isAdminRoute = adminOnlyRoutes.some((route) => pathname.startsWith(route))
-    if (isAdminRoute && user.user_metadata?.role !== 'admin') {
+  // Enforce per-role page visibility (configured in Settings)
+  if (user && isPathHidden(pathname, restrictablePages)) {
+    const hiddenPages = await getHiddenPages(supabase, user.user_metadata?.role)
+    if (isPathHidden(pathname, hiddenPages)) {
       const url = request.nextUrl.clone()
       url.pathname = '/'
       return NextResponse.redirect(url)

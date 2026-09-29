@@ -24,3 +24,24 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
+
+/* Hover highlighting for table rows and list items. Every data table row gets
+   a blue accent bar on hover; list rows opt in with the .hover-row class. */
+@layer base {
+  tbody > tr {
+    transition: background-color 150ms ease, box-shadow 150ms ease;
+  }
+  tbody > tr:not(.no-hover):hover > td:first-child {
+    box-shadow: inset 3px 0 0 #3b82f6;
+  }
+}
+
+@layer components {
+  .hover-row {
+    transition: background-color 150ms ease, box-shadow 150ms ease;
+  }
+  .hover-row:hover {
+    background-color: #eff6ff;
+    box-shadow: inset 3px 0 0 #3b82f6;
+  }
+}

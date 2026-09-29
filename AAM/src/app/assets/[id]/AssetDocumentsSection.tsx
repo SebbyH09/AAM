@@ -221,7 +221,7 @@ export default function AssetDocumentsSection({ assetId }: AssetDocumentsSection
           <p className="px-6 py-4 text-sm text-gray-400">No documents attached.</p>
         ) : (
           documents.map((doc) => (
-            <div key={doc.id} className="flex items-start justify-between px-6 py-3 gap-4">
+            <div key={doc.id} className="hover-row flex items-start justify-between px-6 py-3 gap-4">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-medium text-gray-900">{doc.name}</p>

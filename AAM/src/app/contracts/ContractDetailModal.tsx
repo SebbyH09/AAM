@@ -431,7 +431,7 @@ export default function ContractDetailModal({ contract: initialContract, onClose
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {reports.map((r) => (
-                        <tr key={r.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedReport(r)}>
+                        <tr key={r.id} className="hover:bg-blue-50 cursor-pointer" onClick={() => setSelectedReport(r)}>
                           <td className="px-4 py-2 text-sm text-gray-700">{formatDate(r.report_date)}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">{r.technician || '—'}</td>
                           <td className="px-4 py-2 text-sm text-gray-600 capitalize">{r.type.replace(/_/g, ' ')}</td>

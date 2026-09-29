@@ -226,7 +226,7 @@ export default function RecordAttachments({
         {attachments.length > 0 && (
           <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
             {attachments.map((a) => (
-              <div key={a.id} className="flex items-start justify-between gap-4 px-4 py-3">
+              <div key={a.id} className="hover-row flex items-start justify-between gap-4 px-4 py-3">
                 <div className="flex min-w-0 items-start gap-3">
                   <FileText className="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
                   <div className="min-w-0">

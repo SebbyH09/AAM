@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { useAssetCategories } from '@/hooks/useAssetCategories'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Upload, CheckCircle2, XCircle, Download, AlertTriangle } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
-const VALID_CATEGORIES = ['Analytical', 'Lab Equipment', 'HVAC', 'IT/Network', 'Electrical', 'Mechanical', 'Other']
 const VALID_STATUSES = ['active', 'inactive', 'repair', 'decommissioned']
 
 const REQUIRED_COLUMNS = ['name', 'category']
@@ -49,6 +49,7 @@ interface AssetImportProps {
 }
 
 export default function AssetImport({ onSuccess }: AssetImportProps) {
+  const validCategories = useAssetCategories()
   const router = useRouter()
   const supabase = createClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -190,8 +191,8 @@ export default function AssetImport({ onSuccess }: AssetImportProps) {
   function validateRow(row: ParsedRow, index: number): string | null {
     if (!row.name) return `Row ${index + 2}: Name is required`
     if (!row.category) return `Row ${index + 2}: Category is required`
-    if (!VALID_CATEGORIES.includes(row.category)) {
-      return `Row ${index + 2}: Invalid category "${row.category}". Valid: ${VALID_CATEGORIES.join(', ')}`
+    if (!validCategories.includes(row.category)) {
+      return `Row ${index + 2}: Invalid category "${row.category}". Valid: ${validCategories.join(', ')}`
     }
     if (row.status && !VALID_STATUSES.includes(row.status)) {
       return `Row ${index + 2}: Invalid status "${row.status}". Valid: ${VALID_STATUSES.join(', ')}`
@@ -345,7 +346,7 @@ export default function AssetImport({ onSuccess }: AssetImportProps) {
 
       <div className="text-xs text-gray-500 space-y-1">
         <p><strong>Required columns:</strong> name, category</p>
-        <p><strong>Valid categories:</strong> {VALID_CATEGORIES.join(', ')}</p>
+        <p><strong>Valid categories:</strong> {validCategories.join(', ')}</p>
         <p><strong>Valid statuses:</strong> {VALID_STATUSES.join(', ')} (defaults to &quot;active&quot;)</p>
         <p><strong>Date format:</strong> YYYY-MM-DD</p>
       </div>

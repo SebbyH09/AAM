@@ -150,7 +150,7 @@ export default function LaborLogSection({ repairId }: LaborLogSectionProps) {
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
                 {entries.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-gray-50">
+                  <tr key={entry.id} className="hover:bg-blue-50">
                     <td className="px-6 py-3 text-sm font-medium text-gray-900">{entry.technician}</td>
                     <td className="px-6 py-3 text-sm text-gray-600">{formatDate(entry.work_date)}</td>
                     <td className="px-6 py-3 text-sm text-gray-900 font-semibold">{entry.hours}h</td>

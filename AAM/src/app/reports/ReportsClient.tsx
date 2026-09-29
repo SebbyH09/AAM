@@ -354,7 +354,7 @@ export default function ReportsClient({
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
                   {maintenanceByMonth.filter(m => m.count > 0).map((m) => (
-                    <tr key={m.label} className="hover:bg-gray-50">
+                    <tr key={m.label} className="hover:bg-blue-50">
                       <td className="px-6 py-3 text-sm text-gray-900">{m.label}</td>
                       <td className="px-6 py-3 text-sm text-gray-700">{m.count}</td>
                       <td className="px-6 py-3 text-sm text-gray-700">{formatCurrency(m.cost)}</td>
@@ -518,7 +518,7 @@ export default function ReportsClient({
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
                     {lowStockParts.map((p) => (
-                      <tr key={p.id} className="hover:bg-gray-50">
+                      <tr key={p.id} className="hover:bg-blue-50">
                         <td className="px-6 py-3 text-sm font-medium text-gray-900">{p.name}</td>
                         <td className="px-6 py-3 text-sm text-red-600 font-semibold">{p.quantity_on_hand}</td>
                         <td className="px-6 py-3 text-sm text-gray-600">{p.reorder_point}</td>

@@ -239,7 +239,7 @@ export default function DowntimeClient({ events, assets }: DowntimeClientProps) 
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {completedEvents.map((event) => (
-                  <tr key={event.id} className="hover:bg-gray-50">
+                  <tr key={event.id} className="hover:bg-blue-50">
                     <td className="px-6 py-4">
                       <p className="text-sm font-medium text-gray-900">{event.assets?.name ?? '—'}</p>
                     </td>
