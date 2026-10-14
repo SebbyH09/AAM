@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { X, CheckCircle2, ExternalLink, Package, Plus, Building2, ClipboardList } from 'lucide-react'
+import { X, CheckCircle2, ExternalLink, Package, Plus, ClipboardList } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { createClient } from '@/lib/supabase/client'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge } from '@/lib/utils'
-import type { Asset, ServiceContract } from '@/types/database'
+import type { Asset } from '@/types/database'
 
 interface EquipmentPlan {
   id: string
@@ -33,13 +33,6 @@ interface EquipmentDetailModalProps<P extends EquipmentPlan> {
   onLogPlan: (plan: P) => void
 }
 
-type VendorContract = Pick<
-  ServiceContract,
-  'id' | 'vendor_name' | 'vendor_contact' | 'vendor_email' | 'vendor_phone' | 'contract_type' | 'contract_number' | 'start_date' | 'end_date' | 'status'
->
-
-const CONTRACT_FIELDS = 'id, vendor_name, vendor_contact, vendor_email, vendor_phone, contract_type, contract_number, start_date, end_date, status'
-
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
@@ -58,7 +51,6 @@ export default function EquipmentDetailModal<P extends EquipmentPlan>({
   onLogPlan,
 }: EquipmentDetailModalProps<P>) {
   const [asset, setAsset] = useState<Asset | null>(null)
-  const [contracts, setContracts] = useState<VendorContract[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -69,31 +61,10 @@ export default function EquipmentDetailModal<P extends EquipmentPlan>({
     async function load() {
       setLoading(true)
       setError('')
-      // Contracts can reference the asset directly or through the service_contract_assets link table.
-      const [assetRes, directRes, linkedRes] = await Promise.all([
-        supabase.from('assets').select('*').eq('id', assetId).single(),
-        supabase.from('service_contracts').select(CONTRACT_FIELDS).eq('asset_id', assetId),
-        supabase.from('service_contract_assets').select(`service_contracts(${CONTRACT_FIELDS})`).eq('asset_id', assetId),
-      ])
+      const { data, error } = await supabase.from('assets').select('*').eq('id', assetId).single()
       if (cancelled) return
-
-      if (assetRes.error) setError(assetRes.error.message)
-      setAsset(assetRes.data ?? null)
-
-      const byId = new Map<string, VendorContract>()
-      for (const c of (directRes.data ?? []) as VendorContract[]) byId.set(c.id, c)
-      for (const row of (linkedRes.data ?? []) as { service_contracts: VendorContract | VendorContract[] | null }[]) {
-        const linked = Array.isArray(row.service_contracts) ? row.service_contracts : row.service_contracts ? [row.service_contracts] : []
-        for (const c of linked) byId.set(c.id, c)
-      }
-      // Active contracts first, then the most recent end date.
-      setContracts(
-        Array.from(byId.values()).sort((a, b) => {
-          if (a.status === 'active' && b.status !== 'active') return -1
-          if (b.status === 'active' && a.status !== 'active') return 1
-          return b.end_date.localeCompare(a.end_date)
-        })
-      )
+      if (error) setError(error.message)
+      setAsset(data ?? null)
       setLoading(false)
     }
 
@@ -102,8 +73,6 @@ export default function EquipmentDetailModal<P extends EquipmentPlan>({
       cancelled = true
     }
   }, [assetId])
-
-  const primaryVendor = contracts[0]?.vendor_name ?? null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -143,7 +112,6 @@ export default function EquipmentDetailModal<P extends EquipmentPlan>({
               <p className="text-sm text-gray-400">Loading equipment details...</p>
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                <Field label="Vendor" value={primaryVendor} />
                 <Field label="Manufacturer" value={asset?.manufacturer} />
                 <Field label="Model" value={asset?.model} />
                 <Field label="Serial Number" value={asset?.serial_number} />
@@ -157,58 +125,6 @@ export default function EquipmentDetailModal<P extends EquipmentPlan>({
             {asset?.notes && (
               <div className="mt-4">
                 <Field label="Notes" value={asset.notes} />
-              </div>
-            )}
-          </section>
-
-          {/* Vendors / Service Contracts */}
-          <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
-              <Building2 className="h-4 w-4 text-gray-500" />
-              Vendors &amp; Service Contracts ({contracts.length})
-            </h3>
-            {loading ? (
-              <p className="text-sm text-gray-400">Loading contracts...</p>
-            ) : contracts.length === 0 ? (
-              <p className="text-sm text-gray-500">No service contracts linked to this equipment.</p>
-            ) : (
-              <div className="rounded-lg border border-gray-200 overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-100">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Vendor</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Contact</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Type</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Ends</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {contracts.map((c) => (
-                      <tr key={c.id}>
-                        <td className="px-4 py-2 text-sm text-gray-700">
-                          <p className="font-medium">{c.vendor_name}</p>
-                          {c.contract_number && <p className="text-xs text-gray-500">#{c.contract_number}</p>}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-600">
-                          {c.vendor_contact && <p>{c.vendor_contact}</p>}
-                          {c.vendor_phone && <p className="text-xs text-gray-500">{c.vendor_phone}</p>}
-                          {c.vendor_email && (
-                            <a href={`mailto:${c.vendor_email}`} className="text-xs text-blue-600 hover:text-blue-800">
-                              {c.vendor_email}
-                            </a>
-                          )}
-                          {!c.vendor_contact && !c.vendor_phone && !c.vendor_email && '—'}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-600 capitalize">{c.contract_type.replace(/_/g, ' ')}</td>
-                        <td className="px-4 py-2 text-sm text-gray-600">{formatDate(c.end_date)}</td>
-                        <td className="px-4 py-2">
-                          <Badge className={statusColor(c.status)}>{c.status}</Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             )}
           </section>
