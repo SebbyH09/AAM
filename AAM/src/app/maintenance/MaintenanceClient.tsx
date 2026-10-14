@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import LogMaintenanceModal from './LogMaintenanceModal'
 import AddServiceReportModal from '../contracts/AddServiceReportModal'
+import EquipmentDetailModal from './EquipmentDetailModal'
 
 interface Plan {
   id: string
@@ -56,6 +57,7 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
   const [loggingPlan, setLoggingPlan] = useState<Plan | null>(null)
   const [detailPlan, setDetailPlan] = useState<Plan | null>(null)
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set())
+  const [equipmentAssetId, setEquipmentAssetId] = useState<string | null>(null)
   const [showAddReport, setShowAddReport] = useState(false)
   const [planReports, setPlanReports] = useState<any[]>([])
   const [loadingReports, setLoadingReports] = useState(false)
@@ -307,15 +309,29 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
 
               return (
                 <div key={key} className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                  {/* Asset Row */}
-                  <button
-                    onClick={() => toggleAsset(key)}
-                    className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+                  {/* Asset Row: clicking opens the equipment detail window; +/- expands the plan list */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => (group.assetId ? setEquipmentAssetId(group.assetId) : toggleAsset(key))}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
+                      e.preventDefault()
+                      if (group.assetId) setEquipmentAssetId(group.assetId)
+                      else toggleAsset(key)
+                    }}
+                    className="flex w-full cursor-pointer items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className={`flex h-6 w-6 items-center justify-center rounded-md text-gray-500 transition-colors ${isExpanded ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); toggleAsset(key) }}
+                        title={isExpanded ? 'Collapse plans' : 'Expand plans'}
+                        aria-expanded={isExpanded}
+                        className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-blue-100 hover:text-blue-600 ${isExpanded ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
+                      >
                         {isExpanded ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-                      </div>
+                      </button>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-semibold text-gray-900 truncate">{group.assetName}</p>
@@ -347,7 +363,7 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                       </span>
                       <Badge className={nearestBadge.color}>{nearestBadge.label}</Badge>
                     </div>
-                  </button>
+                  </div>
 
                   {/* Expanded Plan List */}
                   {isExpanded && (
@@ -449,6 +465,20 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
           </div>
         </div>
       )}
+
+      {equipmentAssetId && (() => {
+        const group = assetGroups.find((g) => g.assetId === equipmentAssetId)
+        return (
+          <EquipmentDetailModal
+            assetId={equipmentAssetId}
+            assetName={group?.assetName ?? ''}
+            plans={group?.plans ?? []}
+            onClose={() => setEquipmentAssetId(null)}
+            onOpenPlan={(plan) => setDetailPlan(plan)}
+            onLogPlan={(plan) => setLoggingPlan(plan)}
+          />
+        )
+      })()}
 
       {loggingPlan && (
         <LogMaintenanceModal
