@@ -15,6 +15,12 @@ interface RepairFormProps {
   repair?: Repair
   defaultAssetId?: string
   defaultGroupId?: string
+  /** Called after a successful save instead of navigating back to /repairs. */
+  onSaved?: () => void
+  /** Called on Cancel instead of navigating back. */
+  onCancel?: () => void
+  /** Render without the outer card, for use inside a modal. */
+  bare?: boolean
 }
 
 const STATUS_OPTIONS = [
@@ -32,7 +38,7 @@ const PRIORITY_OPTIONS = [
   { value: 'critical', label: 'Critical' },
 ]
 
-export default function RepairForm({ assets, groups, repair, defaultAssetId, defaultGroupId }: RepairFormProps) {
+export default function RepairForm({ assets, groups, repair, defaultAssetId, defaultGroupId, onSaved, onCancel, bare = false }: RepairFormProps) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
@@ -126,13 +132,18 @@ export default function RepairForm({ assets, groups, repair, defaultAssetId, def
       return
     }
 
+    if (onSaved) {
+      setLoading(false)
+      onSaved()
+      return
+    }
     router.push('/repairs')
     router.refresh()
   }
 
   return (
-    <div className="max-w-2xl">
-      <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-6">
+    <div className={bare ? undefined : 'max-w-2xl'}>
+      <form onSubmit={handleSubmit} className={bare ? 'space-y-6' : 'rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-6'}>
         {error && (
           <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>
         )}
@@ -190,7 +201,7 @@ export default function RepairForm({ assets, groups, repair, defaultAssetId, def
           <Button type="submit" loading={loading}>
             {repair ? 'Update Repair' : 'Log Repair'}
           </Button>
-          <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
+          <Button type="button" variant="outline" onClick={() => (onCancel ? onCancel() : router.back())}>Cancel</Button>
         </div>
       </form>
     </div>

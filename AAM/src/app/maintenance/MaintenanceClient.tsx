@@ -386,7 +386,7 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                           {group.plans.map((plan) => {
                             const badge = dueStatusBadge(plan.next_due_date)
                             return (
-                              <tr key={plan.id} onClick={() => setDetailPlan(plan)} className="hover:bg-blue-50 transition-colors cursor-pointer">
+                              <tr key={plan.id} onClick={() => setDetailPlan(plan)} className="hover:bg-blue-100 transition-colors cursor-pointer">
                                 <td className="px-6 py-3">
                                   <p className="text-sm font-medium text-gray-900">{plan.name}</p>
                                   {plan.estimated_duration_hours && (
@@ -643,7 +643,7 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {planReports.map((r: any) => (
-                          <tr key={r.id} className="hover:bg-blue-50">
+                          <tr key={r.id} className="hover:bg-blue-100">
                             <td className="px-4 py-2 text-sm text-gray-700">{formatDate(r.report_date)}</td>
                             <td className="px-4 py-2 text-sm text-gray-700">{r.technician || '—'}</td>
                             <td className="px-4 py-2 text-sm text-gray-700 max-w-[200px] truncate">{r.summary || r.file_name || '—'}</td>

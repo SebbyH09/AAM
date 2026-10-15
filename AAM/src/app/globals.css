@@ -41,7 +41,7 @@ body {
     transition: background-color 150ms ease, box-shadow 150ms ease;
   }
   .hover-row:hover {
-    background-color: #eff6ff;
+    background-color: #dbeafe;
     box-shadow: inset 3px 0 0 #3b82f6;
   }
 }
