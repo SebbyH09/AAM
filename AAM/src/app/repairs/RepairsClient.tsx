@@ -4,34 +4,27 @@ import { useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor } from '@/lib/utils'
 import Link from 'next/link'
-import { Search, Wrench, ChevronRight } from 'lucide-react'
-
-interface Repair {
-  id: string
-  description: string
-  priority: string
-  status: string
-  reported_date: string
-  completed_date: string | null
-  reported_by: string
-  assigned_to: string | null
-  total_cost: number | null
-  repair_number: string | null
-  warranty_repair: boolean
-  assets: { name: string; asset_tag: string | null; serial_number: string | null; model: string | null } | null
-}
+import { Search, Wrench } from 'lucide-react'
+import { PickerAsset } from '@/components/AssetPicker'
+import RepairDetailModal, { RepairWithAsset } from './RepairDetailModal'
 
 interface RepairsClientProps {
-  repairs: Repair[]
+  repairs: RepairWithAsset[]
+  assets: PickerAsset[]
 }
+
+const OPEN_STATUSES = ['open', 'in_progress', 'waiting_parts']
 
 const STATUS_FILTERS = ['all', 'open', 'in_progress', 'waiting_parts', 'completed', 'cancelled']
 const PRIORITY_FILTERS = ['all', 'critical', 'high', 'medium', 'low']
 
-export default function RepairsClient({ repairs }: RepairsClientProps) {
+export default function RepairsClient({ repairs, assets }: RepairsClientProps) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
+  // Track by id so the modal picks up fresh data after router.refresh().
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selected = repairs.find((r) => r.id === selectedId) ?? null
 
   const filtered = repairs.filter((r) => {
     const matchSearch =
@@ -46,7 +39,63 @@ export default function RepairsClient({ repairs }: RepairsClientProps) {
     return matchSearch && matchStatus && matchPriority
   })
 
-  const openCount = repairs.filter((r) => ['open', 'in_progress', 'waiting_parts'].includes(r.status)).length
+  const openCount = repairs.filter((r) => OPEN_STATUSES.includes(r.status)).length
+  const openRepairs = filtered.filter((r) => OPEN_STATUSES.includes(r.status))
+  const closedRepairs = filtered.filter((r) => !OPEN_STATUSES.includes(r.status))
+
+  function renderTable(rows: RepairWithAsset[]) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Description</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Asset</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Priority</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Reported</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Cost</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {rows.map((repair) => (
+              <tr
+                key={repair.id}
+                onClick={() => setSelectedId(repair.id)}
+                className="hover:bg-blue-100 transition-colors cursor-pointer"
+              >
+                <td className="px-6 py-4">
+                  <p className="text-sm font-medium text-gray-900 max-w-xs truncate">{repair.description}</p>
+                  <p className="text-xs text-gray-500">
+                    {repair.repair_number && `#${repair.repair_number} • `}
+                    By {repair.reported_by}
+                    {repair.warranty_repair && ' • Warranty'}
+                  </p>
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  {repair.assets?.name ?? '—'}
+                  {repair.assets?.asset_tag && <span className="block text-xs text-gray-400">{repair.assets.asset_tag}</span>}
+                </td>
+                <td className="px-6 py-4">
+                  <Badge className={statusColor(repair.priority)}>{repair.priority}</Badge>
+                </td>
+                <td className="px-6 py-4">
+                  <Badge className={statusColor(repair.status)}>{repair.status.replace('_', ' ')}</Badge>
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  <p>{formatDate(repair.reported_date)}</p>
+                  {repair.completed_date && (
+                    <p className="text-xs text-gray-400">Done: {formatDate(repair.completed_date)}</p>
+                  )}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">{formatCurrency(repair.total_cost)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -111,60 +160,30 @@ export default function RepairsClient({ repairs }: RepairsClientProps) {
           </Link>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Description</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Asset</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Priority</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Reported</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Cost</th>
-                <th className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map((repair) => (
-                <tr key={repair.id} className="hover:bg-blue-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-medium text-gray-900 max-w-xs truncate">{repair.description}</p>
-                    <p className="text-xs text-gray-500">
-                      {repair.repair_number && `#${repair.repair_number} • `}
-                      By {repair.reported_by}
-                      {repair.warranty_repair && ' • Warranty'}
-                    </p>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {repair.assets?.name ?? '—'}
-                    {repair.assets?.asset_tag && <span className="block text-xs text-gray-400">{repair.assets.asset_tag}</span>}
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge className={statusColor(repair.priority)}>{repair.priority}</Badge>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge className={statusColor(repair.status)}>{repair.status.replace('_', ' ')}</Badge>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    <p>{formatDate(repair.reported_date)}</p>
-                    {repair.completed_date && (
-                      <p className="text-xs text-gray-400">Done: {formatDate(repair.completed_date)}</p>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{formatCurrency(repair.total_cost)}</td>
-                  <td className="px-6 py-4 text-right">
-                    <Link
-                      href={`/repairs/${repair.id}/edit`}
-                      className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
-                    >
-                      Edit <ChevronRight className="h-4 w-4" />
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-8">
+          {openRepairs.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gray-700">
+                Open Repairs
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">{openRepairs.length}</span>
+              </h2>
+              {renderTable(openRepairs)}
+            </section>
+          )}
+          {closedRepairs.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gray-500">
+                Closed Repairs
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{closedRepairs.length}</span>
+              </h2>
+              {renderTable(closedRepairs)}
+            </section>
+          )}
         </div>
+      )}
+
+      {selected && (
+        <RepairDetailModal repair={selected} assets={assets} onClose={() => setSelectedId(null)} />
       )}
     </div>
   )

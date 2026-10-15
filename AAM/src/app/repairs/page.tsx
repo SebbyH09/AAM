@@ -3,16 +3,20 @@ import Header from '@/components/layout/Header'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import RepairsClient from './RepairsClient'
+import { ASSET_PICKER_COLUMNS } from '@/lib/assetPicker'
 
 export const dynamic = 'force-dynamic'
 
 export default async function RepairsPage() {
   const supabase = await createClient()
 
-  const { data: repairs } = await supabase
-    .from('repairs')
-    .select('*, assets(name, asset_tag, serial_number, model)')
-    .order('reported_date', { ascending: false })
+  const [{ data: repairs }, { data: assets }] = await Promise.all([
+    supabase
+      .from('repairs')
+      .select('*, assets(name, asset_tag, serial_number, model)')
+      .order('reported_date', { ascending: false }),
+    supabase.from('assets').select(ASSET_PICKER_COLUMNS).order('name'),
+  ])
 
   return (
     <div>
@@ -30,7 +34,7 @@ export default async function RepairsPage() {
         }
       />
       <div className="p-6">
-        <RepairsClient repairs={repairs ?? []} />
+        <RepairsClient repairs={repairs ?? []} assets={assets ?? []} />
       </div>
     </div>
   )

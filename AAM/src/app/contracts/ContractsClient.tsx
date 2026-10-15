@@ -293,7 +293,7 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                 const pm = getPmStatus(contract)
                 const assetNames = getLinkedAssetNames(contract)
                 return (
-                  <tr key={contract.id} className="hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => setSelectedContract(contract)}>
+                  <tr key={contract.id} className="hover:bg-blue-100 transition-colors cursor-pointer" onClick={() => setSelectedContract(contract)}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <div>
