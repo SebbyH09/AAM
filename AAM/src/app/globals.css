@@ -1,11 +1,206 @@
 @import "tailwindcss";
 
+/* AERA brand palette. Tailwind's built-in color scales are remapped onto the
+   brand colors so existing utility classes (bg-blue-600, text-gray-900, ...)
+   pick them up. Red, green, yellow, orange and amber are left as-is because
+   they carry status meaning (overdue, completed, warning). */
+@theme {
+  --font-sans: Arial, Helvetica, sans-serif;
+
+  /* AERA brand tokens */
+  --color-aera-navy: #00264c;
+  --color-aera-grey: #e1e2e3;
+  --color-aera-blue: #2d3894;
+  --color-aera-slate: #6b7183;
+  --color-aera-white: #ecedee;
+  --color-aera-ocean: #00bddb;
+  --color-aera-magenta: #c3008e;
+  --color-aera-pink: #ff007e;
+  --color-aera-black: #000000;
+
+  /* Neutrals: AERA White, Grey, Slate, Navy, Black */
+  --color-gray-50: #f6f6f7;
+  --color-gray-100: #ecedee;
+  --color-gray-200: #e1e2e3;
+  --color-gray-300: #c6c9cf;
+  --color-gray-400: #9a9eac;
+  --color-gray-500: #6b7183;
+  --color-gray-600: #535b6f;
+  --color-gray-700: #3b455b;
+  --color-gray-800: #1d3150;
+  --color-gray-900: #00264c;
+  --color-gray-950: #000000;
+  --color-slate-50: var(--color-gray-50);
+  --color-slate-100: var(--color-gray-100);
+  --color-slate-200: var(--color-gray-200);
+  --color-slate-300: var(--color-gray-300);
+  --color-slate-400: var(--color-gray-400);
+  --color-slate-500: var(--color-gray-500);
+  --color-slate-600: var(--color-gray-600);
+  --color-slate-700: var(--color-gray-700);
+  --color-slate-800: var(--color-gray-800);
+  --color-slate-900: var(--color-gray-900);
+  --color-slate-950: var(--color-gray-950);
+  --color-zinc-50: var(--color-gray-50);
+  --color-zinc-100: var(--color-gray-100);
+  --color-zinc-200: var(--color-gray-200);
+  --color-zinc-300: var(--color-gray-300);
+  --color-zinc-400: var(--color-gray-400);
+  --color-zinc-500: var(--color-gray-500);
+  --color-zinc-600: var(--color-gray-600);
+  --color-zinc-700: var(--color-gray-700);
+  --color-zinc-800: var(--color-gray-800);
+  --color-zinc-900: var(--color-gray-900);
+  --color-zinc-950: var(--color-gray-950);
+  --color-neutral-50: var(--color-gray-50);
+  --color-neutral-100: var(--color-gray-100);
+  --color-neutral-200: var(--color-gray-200);
+  --color-neutral-300: var(--color-gray-300);
+  --color-neutral-400: var(--color-gray-400);
+  --color-neutral-500: var(--color-gray-500);
+  --color-neutral-600: var(--color-gray-600);
+  --color-neutral-700: var(--color-gray-700);
+  --color-neutral-800: var(--color-gray-800);
+  --color-neutral-900: var(--color-gray-900);
+  --color-neutral-950: var(--color-gray-950);
+  --color-stone-50: var(--color-gray-50);
+  --color-stone-100: var(--color-gray-100);
+  --color-stone-200: var(--color-gray-200);
+  --color-stone-300: var(--color-gray-300);
+  --color-stone-400: var(--color-gray-400);
+  --color-stone-500: var(--color-gray-500);
+  --color-stone-600: var(--color-gray-600);
+  --color-stone-700: var(--color-gray-700);
+  --color-stone-800: var(--color-gray-800);
+  --color-stone-900: var(--color-gray-900);
+  --color-stone-950: var(--color-gray-950);
+
+  /* Primary action color: AERA Blue (600), deepening to AERA Navy (950) */
+  --color-blue-50: #f2f3f9;
+  --color-blue-100: #e2e3f0;
+  --color-blue-200: #c4c7e1;
+  --color-blue-300: #a0a5cf;
+  --color-blue-400: #767eb9;
+  --color-blue-500: #4c56a4;
+  --color-blue-600: #2d3894;
+  --color-blue-700: #20337f;
+  --color-blue-800: #132e6b;
+  --color-blue-900: #062956;
+  --color-blue-950: #00264c;
+  --color-indigo-50: var(--color-blue-50);
+  --color-indigo-100: var(--color-blue-100);
+  --color-indigo-200: var(--color-blue-200);
+  --color-indigo-300: var(--color-blue-300);
+  --color-indigo-400: var(--color-blue-400);
+  --color-indigo-500: var(--color-blue-500);
+  --color-indigo-600: var(--color-blue-600);
+  --color-indigo-700: var(--color-blue-700);
+  --color-indigo-800: var(--color-blue-800);
+  --color-indigo-900: var(--color-blue-900);
+  --color-indigo-950: var(--color-blue-950);
+  --color-sky-50: var(--color-blue-50);
+  --color-sky-100: var(--color-blue-100);
+  --color-sky-200: var(--color-blue-200);
+  --color-sky-300: var(--color-blue-300);
+  --color-sky-400: var(--color-blue-400);
+  --color-sky-500: var(--color-blue-500);
+  --color-sky-600: var(--color-blue-600);
+  --color-sky-700: var(--color-blue-700);
+  --color-sky-800: var(--color-blue-800);
+  --color-sky-900: var(--color-blue-900);
+  --color-sky-950: var(--color-blue-950);
+
+  /* Accent: AERA Magenta (600) */
+  --color-purple-50: #fbf0f8;
+  --color-purple-100: #f7dbef;
+  --color-purple-200: #eeb8df;
+  --color-purple-300: #e48ccc;
+  --color-purple-400: #d859b6;
+  --color-purple-500: #cc269f;
+  --color-purple-600: #c3008e;
+  --color-purple-700: #9c0072;
+  --color-purple-800: #760057;
+  --color-purple-900: #4f003b;
+  --color-purple-950: #3c002d;
+  --color-violet-50: var(--color-purple-50);
+  --color-violet-100: var(--color-purple-100);
+  --color-violet-200: var(--color-purple-200);
+  --color-violet-300: var(--color-purple-300);
+  --color-violet-400: var(--color-purple-400);
+  --color-violet-500: var(--color-purple-500);
+  --color-violet-600: var(--color-purple-600);
+  --color-violet-700: var(--color-purple-700);
+  --color-violet-800: var(--color-purple-800);
+  --color-violet-900: var(--color-purple-900);
+  --color-violet-950: var(--color-purple-950);
+  --color-fuchsia-50: var(--color-purple-50);
+  --color-fuchsia-100: var(--color-purple-100);
+  --color-fuchsia-200: var(--color-purple-200);
+  --color-fuchsia-300: var(--color-purple-300);
+  --color-fuchsia-400: var(--color-purple-400);
+  --color-fuchsia-500: var(--color-purple-500);
+  --color-fuchsia-600: var(--color-purple-600);
+  --color-fuchsia-700: var(--color-purple-700);
+  --color-fuchsia-800: var(--color-purple-800);
+  --color-fuchsia-900: var(--color-purple-900);
+  --color-fuchsia-950: var(--color-purple-950);
+
+  /* Accent: AERA Ocean (600) */
+  --color-cyan-50: #f0fbfd;
+  --color-cyan-100: #dbf6fa;
+  --color-cyan-200: #b8edf5;
+  --color-cyan-300: #8ce1ef;
+  --color-cyan-400: #59d4e8;
+  --color-cyan-500: #26c7e0;
+  --color-cyan-600: #00bddb;
+  --color-cyan-700: #0092b2;
+  --color-cyan-800: #006789;
+  --color-cyan-900: #003c60;
+  --color-cyan-950: #00264c;
+  --color-teal-50: var(--color-cyan-50);
+  --color-teal-100: var(--color-cyan-100);
+  --color-teal-200: var(--color-cyan-200);
+  --color-teal-300: var(--color-cyan-300);
+  --color-teal-400: var(--color-cyan-400);
+  --color-teal-500: var(--color-cyan-500);
+  --color-teal-600: var(--color-cyan-600);
+  --color-teal-700: var(--color-cyan-700);
+  --color-teal-800: var(--color-cyan-800);
+  --color-teal-900: var(--color-cyan-900);
+  --color-teal-950: var(--color-cyan-950);
+
+  /* Accent: AERA Pink (600) */
+  --color-pink-50: #fff0f7;
+  --color-pink-100: #ffdbed;
+  --color-pink-200: #ffb8db;
+  --color-pink-300: #ff8cc5;
+  --color-pink-400: #ff59ab;
+  --color-pink-500: #ff2691;
+  --color-pink-600: #ff007e;
+  --color-pink-700: #cd0065;
+  --color-pink-800: #9b004d;
+  --color-pink-900: #690034;
+  --color-pink-950: #500028;
+  --color-rose-50: var(--color-pink-50);
+  --color-rose-100: var(--color-pink-100);
+  --color-rose-200: var(--color-pink-200);
+  --color-rose-300: var(--color-pink-300);
+  --color-rose-400: var(--color-pink-400);
+  --color-rose-500: var(--color-pink-500);
+  --color-rose-600: var(--color-pink-600);
+  --color-rose-700: var(--color-pink-700);
+  --color-rose-800: var(--color-pink-800);
+  --color-rose-900: var(--color-pink-900);
+  --color-rose-950: var(--color-pink-950);
+}
+
 :root {
-  --background: #f9fafb;
-  --foreground: #111827;
+  --background: #f6f6f7;
+  --foreground: #000000;
 }
 
 body {
+  font-family: var(--font-sans);
   background: var(--background);
   color: var(--foreground);
 }
@@ -18,21 +213,21 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: #c6c9cf;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: #9a9eac;
 }
 
 /* Hover highlighting for table rows and list items. Every data table row gets
-   a blue accent bar on hover; list rows opt in with the .hover-row class. */
+   an AERA Blue accent bar on hover; list rows opt in with the .hover-row class. */
 @layer base {
   tbody > tr {
     transition: background-color 150ms ease, box-shadow 150ms ease;
   }
   tbody > tr:not(.no-hover):hover > td:first-child {
-    box-shadow: inset 3px 0 0 #3b82f6;
+    box-shadow: inset 3px 0 0 #2d3894;
   }
 }
 
@@ -41,7 +236,7 @@ body {
     transition: background-color 150ms ease, box-shadow 150ms ease;
   }
   .hover-row:hover {
-    background-color: #dbeafe;
-    box-shadow: inset 3px 0 0 #3b82f6;
+    background-color: #e2e3f0;
+    box-shadow: inset 3px 0 0 #2d3894;
   }
 }

@@ -38,36 +38,36 @@ async function sendEmail(to: string, subject: string, html: string): Promise<boo
 function buildContractEmail(contract: any, daysLeft: number): string {
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: #1e40af; padding: 20px; border-radius: 8px 8px 0 0;">
+      <div style="background: #2d3894; padding: 20px; border-radius: 8px 8px 0 0;">
         <h1 style="color: white; margin: 0; font-size: 20px;">Service Contract Expiry Alert</h1>
       </div>
-      <div style="border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
-        <p style="color: #374151;">A service contract is ${daysLeft === 0 ? 'expiring <strong>today</strong>' : `expiring in <strong>${daysLeft} day(s)</strong>`}.</p>
+      <div style="border: 1px solid #e1e2e3; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
+        <p style="color: #000000;">A service contract is ${daysLeft === 0 ? 'expiring <strong>today</strong>' : `expiring in <strong>${daysLeft} day(s)</strong>`}.</p>
         <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-          <tr style="background: #f9fafb;">
-            <td style="padding: 8px 12px; color: #6b7280; font-size: 14px;">Vendor</td>
+          <tr style="background: #ecedee;">
+            <td style="padding: 8px 12px; color: #6b7183; font-size: 14px;">Vendor</td>
             <td style="padding: 8px 12px; font-weight: bold;">${contract.vendor_name}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 12px; color: #6b7280; font-size: 14px;">Asset</td>
+            <td style="padding: 8px 12px; color: #6b7183; font-size: 14px;">Asset</td>
             <td style="padding: 8px 12px;">${contract.assets?.name ?? 'N/A'}</td>
           </tr>
-          <tr style="background: #f9fafb;">
-            <td style="padding: 8px 12px; color: #6b7280; font-size: 14px;">Contract #</td>
+          <tr style="background: #ecedee;">
+            <td style="padding: 8px 12px; color: #6b7183; font-size: 14px;">Contract #</td>
             <td style="padding: 8px 12px;">${contract.contract_number ?? 'N/A'}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 12px; color: #6b7280; font-size: 14px;">Expiry Date</td>
+            <td style="padding: 8px 12px; color: #6b7183; font-size: 14px;">Expiry Date</td>
             <td style="padding: 8px 12px; color: #dc2626; font-weight: bold;">${format(new Date(contract.end_date), 'MMMM d, yyyy')}</td>
           </tr>
         </table>
-        <p style="color: #374151; font-size: 14px;">Please renew or replace this contract to maintain coverage.</p>
+        <p style="color: #000000; font-size: 14px;">Please renew or replace this contract to maintain coverage.</p>
         <a href="${process.env.NEXT_PUBLIC_APP_URL}/contracts"
-           style="display: inline-block; background: #1e40af; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; margin-top: 8px;">
+           style="display: inline-block; background: #2d3894; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; margin-top: 8px;">
           View Contracts
         </a>
       </div>
-      <p style="color: #9ca3af; font-size: 12px; margin-top: 16px; text-align: center;">
+      <p style="color: #6b7183; font-size: 12px; margin-top: 16px; text-align: center;">
         Asset Manager Notification System
       </p>
     </div>
@@ -77,40 +77,40 @@ function buildContractEmail(contract: any, daysLeft: number): string {
 function buildMaintenanceEmail(plan: any, daysLeft: number): string {
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: #065f46; padding: 20px; border-radius: 8px 8px 0 0;">
+      <div style="background: #00264c; padding: 20px; border-radius: 8px 8px 0 0;">
         <h1 style="color: white; margin: 0; font-size: 20px;">Maintenance Due Alert</h1>
       </div>
-      <div style="border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
-        <p style="color: #374151;">A maintenance task is ${daysLeft === 0 ? 'due <strong>today</strong>' : `due in <strong>${daysLeft} day(s)</strong>`}.</p>
+      <div style="border: 1px solid #e1e2e3; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
+        <p style="color: #000000;">A maintenance task is ${daysLeft === 0 ? 'due <strong>today</strong>' : `due in <strong>${daysLeft} day(s)</strong>`}.</p>
         <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-          <tr style="background: #f9fafb;">
-            <td style="padding: 8px 12px; color: #6b7280; font-size: 14px;">Task</td>
+          <tr style="background: #ecedee;">
+            <td style="padding: 8px 12px; color: #6b7183; font-size: 14px;">Task</td>
             <td style="padding: 8px 12px; font-weight: bold;">${plan.name}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 12px; color: #6b7280; font-size: 14px;">Asset</td>
+            <td style="padding: 8px 12px; color: #6b7183; font-size: 14px;">Asset</td>
             <td style="padding: 8px 12px;">${plan.assets?.name ?? 'N/A'}</td>
           </tr>
-          <tr style="background: #f9fafb;">
-            <td style="padding: 8px 12px; color: #6b7280; font-size: 14px;">Priority</td>
+          <tr style="background: #ecedee;">
+            <td style="padding: 8px 12px; color: #6b7183; font-size: 14px;">Priority</td>
             <td style="padding: 8px 12px; text-transform: capitalize;">${plan.priority}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 12px; color: #6b7280; font-size: 14px;">Due Date</td>
+            <td style="padding: 8px 12px; color: #6b7183; font-size: 14px;">Due Date</td>
             <td style="padding: 8px 12px; color: #dc2626; font-weight: bold;">${format(new Date(plan.next_due_date), 'MMMM d, yyyy')}</td>
           </tr>
           ${plan.assigned_to ? `
-          <tr style="background: #f9fafb;">
-            <td style="padding: 8px 12px; color: #6b7280; font-size: 14px;">Assigned To</td>
+          <tr style="background: #ecedee;">
+            <td style="padding: 8px 12px; color: #6b7183; font-size: 14px;">Assigned To</td>
             <td style="padding: 8px 12px;">${plan.assigned_to}</td>
           </tr>` : ''}
         </table>
         <a href="${process.env.NEXT_PUBLIC_APP_URL}/maintenance"
-           style="display: inline-block; background: #065f46; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; margin-top: 8px;">
+           style="display: inline-block; background: #00264c; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; margin-top: 8px;">
           View Maintenance Plans
         </a>
       </div>
-      <p style="color: #9ca3af; font-size: 12px; margin-top: 16px; text-align: center;">
+      <p style="color: #6b7183; font-size: 12px; margin-top: 16px; text-align: center;">
         Asset Manager Notification System
       </p>
     </div>
