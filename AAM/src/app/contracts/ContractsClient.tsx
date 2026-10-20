@@ -1,14 +1,15 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge } from '@/lib/utils'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Search, FileText, ChevronRight, Paperclip, Wrench, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { Search, FileText, ChevronRight, Paperclip, Wrench, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, Download, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { addMonths, parseISO, differenceInDays, format } from 'date-fns'
 import ContractDetailModal from './ContractDetailModal'
+import * as XLSX from 'xlsx'
 
 interface LinkedAsset {
   asset_id: string
@@ -109,6 +110,95 @@ function getPmStatus(contract: Contract): { label: string; nextDate: string; las
   return { label: `${daysLeft}d left`, nextDate: nextFormatted, lastDate: lastFormatted, color: 'bg-green-100 text-green-800' }
 }
 
+function formatExportDate(date: Date | null): string {
+  return date ? format(date, 'yyyy-MM-dd') : ''
+}
+
+// Assets covered by a contract, falling back to the legacy single asset_id link.
+function getExportAssets(contract: Contract) {
+  const linked = contract.service_contract_assets?.filter((la) => la.assets) ?? []
+  if (linked.length > 0) {
+    return linked.map((la) => ({ ...la.assets!, pm_last_performed_date: la.pm_last_performed_date }))
+  }
+  return contract.assets
+    ? [{ ...contract.assets, pm_last_performed_date: contract.pm_last_performed_date }]
+    : []
+}
+
+function exportContracts(contracts: Contract[], fileFormat: 'xlsx' | 'csv') {
+  const contractRows = contracts.map((c) => {
+    const assets = getExportAssets(c)
+    const joined = (key: 'asset_tag' | 'serial_number' | 'model') =>
+      assets.map((a) => a[key] ?? '').filter(Boolean).join(', ')
+    return {
+      'Contract Number': c.contract_number ?? '',
+      'Vendor': c.vendor_name,
+      'Vendor Contact': c.vendor_contact ?? '',
+      'Vendor Email': c.vendor_email ?? '',
+      'Vendor Phone': c.vendor_phone ?? '',
+      'Contract Type': c.contract_type.replace(/_/g, ' '),
+      'Status': c.status,
+      'Start Date': c.start_date,
+      'End Date': c.end_date,
+      'Days Until Expiry': differenceInDays(parseISO(c.end_date), new Date()),
+      'Cost': c.cost ?? '',
+      'Covered Assets': assets.map((a) => a.name).join(', '),
+      'Asset Tags': joined('asset_tag'),
+      'Serial Numbers': joined('serial_number'),
+      'Models': joined('model'),
+      'PM Interval (Months)': c.pm_interval_months,
+      'Last PM': formatExportDate(getPmLastDate(c)),
+      'Next PM Due': formatExportDate(getPmNextDate(c)),
+      'Coverage Details': c.coverage_details ?? '',
+      'Notes': c.notes ?? '',
+      'Attachment': c.file_name ?? '',
+      'Renewed At': c.renewed_at ? c.renewed_at.slice(0, 10) : '',
+    }
+  })
+
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.json_to_sheet(contractRows)
+  ws['!cols'] = [
+    { wch: 16 }, { wch: 22 }, { wch: 18 }, { wch: 24 }, { wch: 16 }, { wch: 18 },
+    { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 30 },
+    { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
+    { wch: 36 }, { wch: 30 }, { wch: 24 }, { wch: 12 },
+  ]
+  XLSX.utils.book_append_sheet(wb, ws, 'Contracts')
+
+  const timestamp = new Date().toISOString().slice(0, 10)
+  if (fileFormat === 'csv') {
+    XLSX.writeFile(wb, `service_contracts_${timestamp}.csv`, { bookType: 'csv' })
+    return
+  }
+
+  // Excel also gets a per-asset breakdown, since each covered asset tracks its own PM date.
+  const assetRows = contracts.flatMap((c) =>
+    getExportAssets(c).map((a) => {
+      const last = a.pm_last_performed_date ? parseISO(a.pm_last_performed_date) : null
+      return {
+        'Contract Number': c.contract_number ?? '',
+        'Vendor': c.vendor_name,
+        'Contract Status': c.status,
+        'Contract End Date': c.end_date,
+        'Asset': a.name,
+        'Asset Tag': a.asset_tag ?? '',
+        'Serial Number': a.serial_number ?? '',
+        'Model': a.model ?? '',
+        'Last PM': formatExportDate(last),
+        'Next PM Due': formatExportDate(last ? addMonths(last, c.pm_interval_months) : null),
+      }
+    })
+  )
+  const assetWs = XLSX.utils.json_to_sheet(assetRows)
+  assetWs['!cols'] = [
+    { wch: 16 }, { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 26 },
+    { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 12 },
+  ]
+  XLSX.utils.book_append_sheet(wb, assetWs, 'Covered Assets')
+  XLSX.writeFile(wb, `service_contracts_${timestamp}.xlsx`)
+}
+
 interface ContractsClientProps {
   contracts: Contract[]
 }
@@ -158,6 +248,18 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
   // Default to expiry ascending, which matches the order the rows arrive in.
   const [sortField, setSortField] = useState<SortField>('expiry')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [exportOpen, setExportOpen] = useState(false)
+  const exportRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const filtered = contracts.filter((c) => {
     const q = search.toLowerCase()
@@ -230,6 +332,38 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
               {s}
             </button>
           ))}
+        </div>
+
+        {/* Export dropdown */}
+        <div ref={exportRef} className="relative sm:ml-auto">
+          <button
+            onClick={() => setExportOpen((v) => !v)}
+            disabled={sorted.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export
+            <ChevronDown className="h-3 w-3" />
+          </button>
+          {exportOpen && (
+            <div className="absolute right-0 top-full mt-1 z-10 w-52 rounded-lg border border-gray-200 bg-white shadow-lg">
+              <p className="px-4 py-2 text-xs text-gray-500 border-b border-gray-100">
+                All {sorted.length} contract{sorted.length === 1 ? '' : 's'} shown
+              </p>
+              <button
+                onClick={() => { exportContracts(sorted, 'xlsx'); setExportOpen(false) }}
+                className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Export as Excel
+              </button>
+              <button
+                onClick={() => { exportContracts(sorted, 'csv'); setExportOpen(false) }}
+                className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-b-lg border-t border-gray-100"
+              >
+                Export as CSV
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
