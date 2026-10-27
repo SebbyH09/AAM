@@ -9,10 +9,13 @@ export const dynamic = 'force-dynamic'
 export default async function MaintenancePage() {
   const supabase = await createClient()
 
-  const { data: plans } = await supabase
-    .from('maintenance_plans')
-    .select('*, assets(id, name, asset_tag, serial_number, model, location, category, status)')
-    .order('next_due_date')
+  const [{ data: plans }, { data: groups }] = await Promise.all([
+    supabase
+      .from('maintenance_plans')
+      .select('*, assets(id, name, asset_tag, serial_number, model, location, category, status, group_id)')
+      .order('next_due_date'),
+    supabase.from('asset_groups').select('id, name').order('name'),
+  ])
 
   return (
     <div>
@@ -30,7 +33,7 @@ export default async function MaintenancePage() {
         }
       />
       <div className="p-6">
-        <MaintenanceClient plans={plans ?? []} />
+        <MaintenanceClient plans={plans ?? []} groups={groups ?? []} />
       </div>
     </div>
   )

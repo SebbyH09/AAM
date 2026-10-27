@@ -6,6 +6,9 @@ import { createClient } from '@/lib/supabase/client'
 import { Modal } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { ChecklistProgress } from '@/components/PlanChecklist'
+import { checklistProgress, checklistSummary, parseChecklist, resetChecklist } from '@/lib/checklist'
+import type { Json } from '@/types/database'
 
 interface Plan {
   id: string
@@ -14,6 +17,7 @@ interface Plan {
   asset_id?: string | null
   frequency: string
   frequency_days?: number | null
+  checklist?: Json | null
 }
 
 interface LogMaintenanceModalProps {
@@ -55,6 +59,9 @@ export default function LogMaintenanceModal({ plan, onClose }: LogMaintenanceMod
   const today = new Date().toISOString().split('T')[0]
   const isOneTime = plan.frequency === 'one_time'
   const suggestedNext = isOneTime ? '' : getNextDate(plan.frequency, plan.frequency_days)
+  const steps = parseChecklist(plan.checklist)
+  const progress = checklistProgress(steps)
+  const stepsUnfinished = progress.done < progress.total
 
   const [form, setForm] = useState({
     performed_by: '',
@@ -65,7 +72,7 @@ export default function LogMaintenanceModal({ plan, onClose }: LogMaintenanceMod
     findings: '',
     parts_replaced: '',
     cost: '',
-    status: 'completed',
+    status: stepsUnfinished ? 'incomplete' : 'completed',
     next_maintenance_date: suggestedNext,
     notes: '',
   })
@@ -96,18 +103,21 @@ export default function LogMaintenanceModal({ plan, onClose }: LogMaintenanceMod
       cost: form.cost ? parseFloat(form.cost) : null,
       status: form.status as any,
       next_maintenance_date: form.next_maintenance_date || null,
-      notes: form.notes || null,
+      notes: [form.notes, steps.length ? checklistSummary(steps) : ''].filter(Boolean).join('\n\n') || null,
     }
 
     const { error: recordError } = await supabase.from('maintenance_records').insert(recordPayload)
     if (recordError) { setError(recordError.message); setLoading(false); return }
 
     // Update plan's last_performed_date and next_due_date; a completed one-time plan is closed out
-    // (next_due_date is required, so a blank next date keeps the current one)
+    // (next_due_date is required, so a blank next date keeps the current one).
+    // Completing a recurring plan unticks its steps for the next cycle; otherwise progress is kept.
+    const completed = form.status === 'completed'
     await supabase.from('maintenance_plans').update({
       last_performed_date: form.performed_date,
       ...(form.next_maintenance_date ? { next_due_date: form.next_maintenance_date } : {}),
-      ...(isOneTime && form.status === 'completed' ? { is_active: false } : {}),
+      ...(isOneTime && completed ? { is_active: false } : {}),
+      ...(!isOneTime && completed && steps.length ? { checklist: resetChecklist(plan.checklist) } : {}),
     }).eq('id', plan.id)
 
     router.refresh()
@@ -125,6 +135,14 @@ export default function LogMaintenanceModal({ plan, onClose }: LogMaintenanceMod
           <p className="text-sm text-blue-700">
             <strong>Asset:</strong> {plan.assets?.name ?? 'N/A'} • <strong>Plan:</strong> {plan.name}
           </p>
+          {steps.length > 0 && (
+            <div className="mt-2 flex items-center gap-2">
+              <ChecklistProgress steps={steps} />
+              {stepsUnfinished && (
+                <span className="text-xs text-blue-700">Not every step is checked off, so this defaults to Incomplete.</span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -8,6 +8,8 @@ import { notFound } from 'next/navigation'
 import { ClipboardList, FileText, Wrench, Zap } from 'lucide-react'
 import GroupDetailClient from './GroupDetailClient'
 import GroupActions from './GroupActions'
+import { ChecklistProgress } from '@/components/PlanChecklist'
+import { parseChecklist } from '@/lib/checklist'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +37,7 @@ export default async function AssetGroupPage({ params }: PageProps) {
     ? await Promise.all([
         supabase
           .from('maintenance_plans')
-          .select('id, name, asset_id, next_due_date, priority, frequency, frequency_days')
+          .select('id, name, asset_id, next_due_date, priority, frequency, frequency_days, checklist')
           .in('asset_id', memberIds)
           .eq('is_active', true)
           .order('next_due_date'),
@@ -103,6 +105,7 @@ export default async function AssetGroupPage({ params }: PageProps) {
                       <p className="mt-1 text-xs text-gray-500">
                         {memberNames.get(p.asset_id)} • Due {formatDate(p.next_due_date)}
                       </p>
+                      <ChecklistProgress steps={parseChecklist(p.checklist)} className="mt-1.5" />
                     </Link>
                   )
                 })
