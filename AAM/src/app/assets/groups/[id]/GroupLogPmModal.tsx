@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { getNextDate } from '@/app/maintenance/LogMaintenanceModal'
 import { splitCost } from '@/lib/assetPicker'
+import { resetChecklist } from '@/lib/checklist'
+import type { Json } from '@/types/database'
 import { dueStatusBadge, formatDate } from '@/lib/utils'
 
 export interface GroupPlan {
@@ -19,6 +21,7 @@ export interface GroupPlan {
   next_due_date: string
   frequency: string
   frequency_days: number | null
+  checklist?: Json | null
 }
 
 interface GroupLogPmModalProps {
@@ -120,6 +123,7 @@ export default function GroupLogPmModal({ groupName, plans, onClose }: GroupLogP
             last_performed_date: form.performed_date,
             ...(nextDates[i] ? { next_due_date: nextDates[i]! } : {}),
             ...(plan.frequency === 'one_time' && form.status === 'completed' ? { is_active: false } : {}),
+            ...(plan.frequency !== 'one_time' && form.status === 'completed' && plan.checklist ? { checklist: resetChecklist(plan.checklist) } : {}),
           })
           .eq('id', plan.id)
       )

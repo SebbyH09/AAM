@@ -8,7 +8,8 @@ import { AssetPicker, PickerAsset, PickerGroup } from '@/components/AssetPicker'
 import { groupValue, parseGroupValue, recordTargets, splitCost } from '@/lib/assetPicker'
 import { Button } from '@/components/ui/Button'
 import { MaintenancePlan } from '@/types/database'
-import { MapPin, Plus, Trash2 } from 'lucide-react'
+import { parseChecklist, newStepId, toJson } from '@/lib/checklist'
+import { ArrowDown, ArrowUp, MapPin, Plus, Trash2 } from 'lucide-react'
 
 interface MaintenancePlanFormProps {
   assets: PickerAsset[]
@@ -66,6 +67,24 @@ export default function MaintenancePlanForm({ assets, groups, plan, defaultAsset
     setParts((prev) => prev.map((p, i) => i === index ? { ...p, [field]: value } : p))
   }
 
+  // Steps keep their id and tick state across edits, so editing the wording doesn't lose progress.
+  const [steps, setSteps] = useState(() => parseChecklist(plan?.checklist))
+
+  const addStep = () => setSteps((prev) => [...prev, { id: newStepId(), text: '', done: false }])
+  const removeStep = (index: number) => setSteps((prev) => prev.filter((_, i) => i !== index))
+  const updateStep = (index: number, text: string) => {
+    setSteps((prev) => prev.map((s, i) => i === index ? { ...s, text } : s))
+  }
+  const moveStep = (index: number, delta: number) => {
+    setSteps((prev) => {
+      const target = index + delta
+      if (target < 0 || target >= prev.length) return prev
+      const next = [...prev]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+  }
+
   const selectedAsset = useMemo(() => assets.find((a) => a.id === form.asset_id), [assets, form.asset_id])
 
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -87,6 +106,7 @@ export default function MaintenancePlanForm({ assets, groups, plan, defaultAsset
     setError('')
 
     const validParts = parts.filter((p) => p.name.trim())
+    const validSteps = steps.filter((s) => s.text.trim()).map((s) => ({ ...s, text: s.text.trim() }))
     const payload = {
       asset_id: form.asset_id || null,
       name: form.name,
@@ -99,6 +119,7 @@ export default function MaintenancePlanForm({ assets, groups, plan, defaultAsset
       estimated_duration_hours: form.estimated_duration_hours ? parseFloat(form.estimated_duration_hours) : null,
       estimated_cost: form.estimated_cost ? parseFloat(form.estimated_cost) : null,
       parts: validParts.length > 0 ? validParts.map((p) => ({ name: p.name, quantity: p.quantity ? parseInt(p.quantity) : 1, part_number: p.part_number || undefined })) : null,
+      checklist: validSteps.length > 0 ? toJson(validSteps) : null,
       is_active: form.is_active,
     }
 
@@ -167,6 +188,44 @@ export default function MaintenancePlanForm({ assets, groups, plan, defaultAsset
           <Input label="Assigned To" value={form.assigned_to} onChange={set('assigned_to')} placeholder="Technician or team" />
           <Input label="Est. Duration (hours)" type="number" value={form.estimated_duration_hours} onChange={set('estimated_duration_hours')} placeholder="0.0" step="0.5" min="0" />
           <Input label="Est. Cost ($)" type="number" value={form.estimated_cost} onChange={set('estimated_cost')} placeholder="0.00" step="0.01" min="0" />
+
+          {/* Steps Section */}
+          <div className="sm:col-span-2">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">Steps</label>
+              <button type="button" onClick={addStep} className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800">
+                <Plus className="h-3 w-3" />
+                Add Step
+              </button>
+            </div>
+            {steps.length === 0 ? (
+              <p className="text-xs text-gray-400">No steps yet. Add steps to break this plan into tasks you can check off.</p>
+            ) : (
+              <div className="space-y-2">
+                {steps.map((step, i) => (
+                  <div key={step.id} className="flex items-center gap-2">
+                    <span className="w-5 text-right text-xs font-medium text-gray-400">{i + 1}.</span>
+                    <input
+                      type="text"
+                      placeholder="Describe this step"
+                      value={step.text}
+                      onChange={(e) => updateStep(i, e.target.value)}
+                      className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <button type="button" onClick={() => moveStep(i, -1)} disabled={i === 0} title="Move up" className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30">
+                      <ArrowUp className="h-4 w-4" />
+                    </button>
+                    <button type="button" onClick={() => moveStep(i, 1)} disabled={i === steps.length - 1} title="Move down" className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30">
+                      <ArrowDown className="h-4 w-4" />
+                    </button>
+                    <button type="button" onClick={() => removeStep(i)} title="Remove step" className="p-1 text-red-400 hover:text-red-600">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Parts Section */}
           <div className="sm:col-span-2">

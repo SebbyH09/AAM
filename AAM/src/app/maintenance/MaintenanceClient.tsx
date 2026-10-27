@@ -4,13 +4,16 @@ import { useState, useMemo, useEffect } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge, getDueStatus } from '@/lib/utils'
 import Link from 'next/link'
-import { Search, ClipboardList, CheckCircle2, AlertTriangle, Plus, Minus, Clock, MapPin, ChevronRight, Package, X, Trash2, XCircle, Power } from 'lucide-react'
+import { Search, ClipboardList, CheckCircle2, AlertTriangle, Plus, Minus, Clock, MapPin, Package, X, Trash2, Power, Box, Tag, Layers, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import LogMaintenanceModal from './LogMaintenanceModal'
 import AddServiceReportModal from '../contracts/AddServiceReportModal'
 import EquipmentDetailModal from './EquipmentDetailModal'
+import { ChecklistProgress, PlanChecklist } from '@/components/PlanChecklist'
+import { ChecklistStep, checklistProgress, parseChecklist, toJson } from '@/lib/checklist'
+import type { Json } from '@/types/database'
 
 interface Plan {
   id: string
@@ -27,16 +30,19 @@ interface Plan {
   estimated_duration_hours: number | null
   estimated_cost: number | null
   parts: { name: string; quantity?: number; part_number?: string }[] | null
-  checklist: any | null
-  assets: { id: string; name: string; asset_tag: string | null; serial_number: string | null; model: string | null; location: string | null; category: string; status: string } | null
+  checklist: Json | null
+  assets: { id: string; name: string; asset_tag: string | null; serial_number: string | null; model: string | null; location: string | null; category: string; status: string; group_id: string | null } | null
 }
 
 interface MaintenanceClientProps {
   plans: Plan[]
+  groups: { id: string; name: string }[]
 }
 
-interface AssetGroup {
+/** One asset and the plans scheduled on it. */
+interface AssetPlans {
   assetId: string | null
+  groupId: string | null
   assetName: string
   assetTag: string | null
   location: string | null
@@ -50,7 +56,30 @@ interface AssetGroup {
 
 const PRIORITY_FILTERS = ['all', 'critical', 'high', 'medium', 'low']
 
-export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
+type GroupBy = 'asset' | 'category' | 'group'
+
+const GROUP_BY_OPTIONS: { value: GroupBy; label: string; icon: typeof Box }[] = [
+  { value: 'asset', label: 'Asset', icon: Box },
+  { value: 'category', label: 'Category', icon: Tag },
+  { value: 'group', label: 'Asset group', icon: Layers },
+]
+
+const GROUP_BY_STORAGE_KEY = 'maintenance.groupBy'
+
+/** A heading on the Maintenance page bundling several assets, e.g. every Analytical instrument. */
+interface PlanSection {
+  key: string
+  name: string
+  href: string | null
+  assets: AssetPlans[]
+  planCount: number
+  overdueCount: number
+  urgentCount: number
+  stepsDone: number
+  stepsTotal: number
+}
+
+export default function MaintenanceClient({ plans, groups }: MaintenanceClientProps) {
   const [search, setSearch] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [showActive, setShowActive] = useState(true)
@@ -65,8 +94,32 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
   const [deleting, setDeleting] = useState(false)
   const [deactivating, setDeactivating] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [groupBy, setGroupBy] = useState<GroupBy>('asset')
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+  // Steps ticked in this visit, shown until the next server refresh brings them back in `plans`.
+  const [checklistEdits, setChecklistEdits] = useState<Record<string, ChecklistStep[]>>({})
   const supabase = createClient()
   const router = useRouter()
+
+  useEffect(() => setChecklistEdits({}), [plans])
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(GROUP_BY_STORAGE_KEY)
+      if (saved === 'asset' || saved === 'category' || saved === 'group') setGroupBy(saved)
+    } catch {}
+  }, [])
+
+  function changeGroupBy(value: GroupBy) {
+    setGroupBy(value)
+    try {
+      localStorage.setItem(GROUP_BY_STORAGE_KEY, value)
+    } catch {}
+  }
+
+  const stepsOf = (plan: Plan) => checklistEdits[plan.id] ?? parseChecklist(plan.checklist)
+  // The log modal needs the latest ticks, including ones made since the page loaded.
+  const withLatestSteps = (plan: Plan): Plan => ({ ...plan, checklist: toJson(stepsOf(plan)) })
 
   useEffect(() => {
     if (detailPlan) {
@@ -131,6 +184,8 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
     router.refresh()
   }
 
+  const groupNames = useMemo(() => new Map(groups.map((g) => [g.id, g.name])), [groups])
+
   const filtered = plans.filter((p) => {
     const matchSearch =
       search === '' ||
@@ -138,6 +193,8 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
       (p.assets?.name?.toLowerCase().includes(search.toLowerCase())) ||
       (p.assets?.serial_number?.toLowerCase().includes(search.toLowerCase())) ||
       (p.assets?.model?.toLowerCase().includes(search.toLowerCase())) ||
+      (p.assets?.category?.toLowerCase().includes(search.toLowerCase())) ||
+      (p.assets?.group_id && groupNames.get(p.assets.group_id)?.toLowerCase().includes(search.toLowerCase())) ||
       (p.assigned_to?.toLowerCase().includes(search.toLowerCase()))
     const matchPriority = priorityFilter === 'all' || p.priority === priorityFilter
     const matchActive = !showActive || p.is_active
@@ -155,8 +212,8 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
   }, [filtered])
 
   // Group plans by asset
-  const assetGroups = useMemo(() => {
-    const groups = new Map<string, AssetGroup>()
+  const assetCards = useMemo(() => {
+    const groups = new Map<string, AssetPlans>()
 
     for (const plan of filtered) {
       const key = plan.assets?.id ?? plan.asset_id ?? '_unassigned'
@@ -164,6 +221,7 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
       if (!groups.has(key)) {
         groups.set(key, {
           assetId: plan.assets?.id ?? plan.asset_id,
+          groupId: plan.assets?.group_id ?? null,
           assetName: plan.assets?.name ?? 'Unassigned',
           assetTag: plan.assets?.asset_tag ?? null,
           location: plan.assets?.location ?? null,
@@ -196,6 +254,56 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
     })
   }, [filtered])
 
+  // Bundle the asset cards under a category or asset-group heading.
+  const sections = useMemo((): PlanSection[] => {
+    if (groupBy === 'asset') return []
+    const byKey = new Map<string, PlanSection>()
+    for (const card of assetCards) {
+      let key: string
+      let name: string
+      let href: string | null = null
+      if (groupBy === 'category') {
+        key = card.category ?? '_none'
+        name = card.category ?? 'Uncategorized'
+      } else if (card.groupId && groupNames.has(card.groupId)) {
+        key = card.groupId
+        name = groupNames.get(card.groupId)!
+        href = `/assets/groups/${card.groupId}`
+      } else {
+        key = '_none'
+        name = 'Not in a group'
+      }
+      const section = byKey.get(key) ?? { key, name, href, assets: [], planCount: 0, overdueCount: 0, urgentCount: 0, stepsDone: 0, stepsTotal: 0 }
+      section.assets.push(card)
+      section.planCount += card.plans.length
+      section.overdueCount += card.overdueCount
+      section.urgentCount += card.urgentCount
+      for (const plan of card.plans) {
+        const { done, total } = checklistProgress(stepsOf(plan))
+        section.stepsDone += done
+        section.stepsTotal += total
+      }
+      byKey.set(key, section)
+    }
+    // Named sections alphabetically; the catch-all bucket last.
+    return [...byKey.values()].sort((a, b) => {
+      if (a.key === '_none') return 1
+      if (b.key === '_none') return -1
+      return a.name.localeCompare(b.name)
+    })
+    // stepsOf reads checklistEdits
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetCards, groupBy, groupNames, checklistEdits])
+
+  const toggleSection = (key: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
   const toggleAsset = (key: string) => {
     setExpandedAssets((prev) => {
       const next = new Set(prev)
@@ -208,6 +316,168 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
     })
   }
 
+  function renderAssetCard(group: AssetPlans) {
+    const key = group.assetId ?? '_unassigned'
+    const isExpanded = expandedAssets.has(key)
+    const nearestBadge = dueStatusBadge(group.nextDueDate)
+
+    return (
+      <div key={key} className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        {/* Asset Row: clicking opens the equipment detail window; +/- expands the plan list */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => (group.assetId ? setEquipmentAssetId(group.assetId) : toggleAsset(key))}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
+            e.preventDefault()
+            if (group.assetId) setEquipmentAssetId(group.assetId)
+            else toggleAsset(key)
+          }}
+          className="flex w-full cursor-pointer items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); toggleAsset(key) }}
+              title={isExpanded ? 'Collapse plans' : 'Expand plans'}
+              aria-expanded={isExpanded}
+              className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-blue-100 hover:text-blue-600 ${isExpanded ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
+            >
+              {isExpanded ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+            </button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-gray-900 truncate">{group.assetName}</p>
+                {group.assetTag && (
+                  <span className="text-xs text-gray-400">{group.assetTag}</span>
+                )}
+                {group.category && (
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{group.category}</span>
+                )}
+              </div>
+              {group.location && (
+                <p className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                  <MapPin className="h-3 w-3" />
+                  {group.location}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {group.overdueCount > 0 && (
+              <Badge className="bg-red-100 text-red-800">{group.overdueCount} overdue</Badge>
+            )}
+            {group.urgentCount > 0 && (
+              <Badge className="bg-orange-100 text-orange-800">{group.urgentCount} due soon</Badge>
+            )}
+            <span className="flex items-center gap-1 text-xs text-gray-500">
+              <Clock className="h-3 w-3" />
+              {group.plans.length} plan{group.plans.length !== 1 ? 's' : ''}
+            </span>
+            <Badge className={nearestBadge.color}>{nearestBadge.label}</Badge>
+          </div>
+        </div>
+
+        {/* Expanded Plan List */}
+        {isExpanded && (
+          <div className="border-t border-gray-100">
+            <table className="min-w-full divide-y divide-gray-100">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Plan</th>
+                  <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Frequency</th>
+                  <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Next Due</th>
+                  <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Last Done</th>
+                  <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Parts</th>
+                  <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Est. Cost</th>
+                  <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Priority</th>
+                  <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Assigned To</th>
+                  <th className="relative px-6 py-2.5"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {group.plans.map((plan) => {
+                  const badge = dueStatusBadge(plan.next_due_date)
+                  return (
+                    <tr key={plan.id} onClick={() => setDetailPlan(plan)} className="hover:bg-blue-100 transition-colors cursor-pointer">
+                      <td className="px-6 py-3">
+                        <p className="text-sm font-medium text-gray-900">{plan.name}</p>
+                        {plan.estimated_duration_hours && (
+                          <p className="text-xs text-gray-500">{plan.estimated_duration_hours}h estimated</p>
+                        )}
+                        <ChecklistProgress steps={stepsOf(plan)} className="mt-1" />
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-600 capitalize">
+                        {plan.frequency.replace('_', ' ')}
+                      </td>
+                      <td className="px-6 py-3">
+                        <div>
+                          <p className="text-sm text-gray-700">{formatDate(plan.next_due_date)}</p>
+                          <Badge className={`mt-1 ${badge.color}`}>{badge.label}</Badge>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-600">
+                        {formatDate(plan.last_performed_date)}
+                      </td>
+                      <td className="px-6 py-3">
+                        {plan.parts && plan.parts.length > 0 ? (
+                          <div className="flex items-center gap-1">
+                            <Package className="h-3.5 w-3.5 text-gray-400" />
+                            <span className="text-sm text-gray-600">{plan.parts.length}</span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-600">
+                        {formatCurrency(plan.estimated_cost)}
+                      </td>
+                      <td className="px-6 py-3">
+                        <Badge className={statusColor(plan.priority)}>{plan.priority}</Badge>
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-600">
+                        {plan.assigned_to ?? '—'}
+                      </td>
+                      <td className="px-6 py-3 text-right">
+                        <div className="flex items-center justify-end gap-3" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => setLoggingPlan(withLatestSteps(plan))}
+                            className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-800"
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            Log
+                          </button>
+                          <Link
+                            href={`/maintenance/${plan.id}/edit`}
+                            className="text-sm text-blue-600 hover:text-blue-800"
+                          >
+                            Edit
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {group.assetId && (
+              <div className="border-t border-gray-100 px-6 py-2 bg-gray-50">
+                <Link
+                  href={`/maintenance/new?asset_id=${group.assetId}`}
+                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                >
+                  <Plus className="h-3 w-3" />
+                  Add plan to this asset
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Filters */}
@@ -216,13 +486,29 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search plans or assets..."
+            placeholder="Search plans, assets, groups..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1" role="group" aria-label="Group plans by">
+            {GROUP_BY_OPTIONS.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => changeGroupBy(value)}
+                aria-pressed={groupBy === value}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  groupBy === value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
           <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
             <input type="checkbox" checked={showActive} onChange={(e) => setShowActive(e.target.checked)}
               className="rounded text-blue-600" />
@@ -259,12 +545,13 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{plan.name}</p>
                       <p className="text-xs text-gray-500 truncate">{plan.assets?.name ?? 'Unassigned'}</p>
+                      <ChecklistProgress steps={stepsOf(plan)} className="mt-1" />
                     </div>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <Badge className={statusColor(plan.priority)}>{plan.priority}</Badge>
                     <button
-                      onClick={() => setLoggingPlan(plan)}
+                      onClick={() => setLoggingPlan(withLatestSteps(plan))}
                       className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-800"
                     >
                       <CheckCircle2 className="h-4 w-4" />
@@ -299,175 +586,59 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
       ) : (
         <div>
           <h3 className="mb-3 text-sm font-semibold text-gray-700">
-            Assets with Maintenance Plans ({assetGroups.length})
+            {groupBy === 'asset'
+              ? `Assets with Maintenance Plans (${assetCards.length})`
+              : `${sections.length} ${groupBy === 'category' ? (sections.length === 1 ? 'category' : 'categories') : (sections.length === 1 ? 'group' : 'groups')} • ${assetCards.length} asset${assetCards.length === 1 ? '' : 's'}`}
           </h3>
-          <div className="space-y-2">
-            {assetGroups.map((group) => {
-              const key = group.assetId ?? '_unassigned'
-              const isExpanded = expandedAssets.has(key)
-              const nearestBadge = dueStatusBadge(group.nextDueDate)
-
-              return (
-                <div key={key} className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                  {/* Asset Row: clicking opens the equipment detail window; +/- expands the plan list */}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => (group.assetId ? setEquipmentAssetId(group.assetId) : toggleAsset(key))}
-                    onKeyDown={(e) => {
-                      if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
-                      e.preventDefault()
-                      if (group.assetId) setEquipmentAssetId(group.assetId)
-                      else toggleAsset(key)
-                    }}
-                    className="flex w-full cursor-pointer items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
+          {groupBy === 'asset' ? (
+            <div className="space-y-2">{assetCards.map(renderAssetCard)}</div>
+          ) : (
+            <div className="space-y-4">
+              {sections.map((section) => {
+                const isOpen = !collapsedSections.has(section.key)
+                return (
+                  <section key={section.key} className="rounded-xl border border-gray-200 bg-gray-50">
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); toggleAsset(key) }}
-                        title={isExpanded ? 'Collapse plans' : 'Expand plans'}
-                        aria-expanded={isExpanded}
-                        className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-blue-100 hover:text-blue-600 ${isExpanded ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
+                        onClick={() => toggleSection(section.key)}
+                        aria-expanded={isOpen}
+                        className="flex min-w-0 items-center gap-2 text-left"
                       >
-                        {isExpanded ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                        {isOpen ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronRight className="h-4 w-4 text-gray-500" />}
+                        <span className="truncate text-sm font-semibold text-gray-900">{section.name}</span>
+                        <span className="text-xs text-gray-500 whitespace-nowrap">
+                          {section.assets.length} asset{section.assets.length === 1 ? '' : 's'} • {section.planCount} plan{section.planCount === 1 ? '' : 's'}
+                        </span>
                       </button>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-gray-900 truncate">{group.assetName}</p>
-                          {group.assetTag && (
-                            <span className="text-xs text-gray-400">{group.assetTag}</span>
-                          )}
-                          {group.category && (
-                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{group.category}</span>
-                          )}
-                        </div>
-                        {group.location && (
-                          <p className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
-                            <MapPin className="h-3 w-3" />
-                            {group.location}
-                          </p>
+                      <div className="flex flex-wrap items-center gap-3">
+                        {section.overdueCount > 0 && (
+                          <Badge className="bg-red-100 text-red-800">{section.overdueCount} overdue</Badge>
+                        )}
+                        {section.urgentCount > 0 && (
+                          <Badge className="bg-orange-100 text-orange-800">{section.urgentCount} due soon</Badge>
+                        )}
+                        {section.stepsTotal > 0 && (
+                          <span className="text-xs text-gray-500">{section.stepsDone}/{section.stepsTotal} steps done</span>
+                        )}
+                        {section.href && (
+                          <Link href={section.href} className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800">
+                            Open group <ExternalLink className="h-3 w-3" />
+                          </Link>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      {group.overdueCount > 0 && (
-                        <Badge className="bg-red-100 text-red-800">{group.overdueCount} overdue</Badge>
-                      )}
-                      {group.urgentCount > 0 && (
-                        <Badge className="bg-orange-100 text-orange-800">{group.urgentCount} due soon</Badge>
-                      )}
-                      <span className="flex items-center gap-1 text-xs text-gray-500">
-                        <Clock className="h-3 w-3" />
-                        {group.plans.length} plan{group.plans.length !== 1 ? 's' : ''}
-                      </span>
-                      <Badge className={nearestBadge.color}>{nearestBadge.label}</Badge>
-                    </div>
-                  </div>
-
-                  {/* Expanded Plan List */}
-                  {isExpanded && (
-                    <div className="border-t border-gray-100">
-                      <table className="min-w-full divide-y divide-gray-100">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Plan</th>
-                            <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Frequency</th>
-                            <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Next Due</th>
-                            <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Last Done</th>
-                            <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Parts</th>
-                            <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Est. Cost</th>
-                            <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Priority</th>
-                            <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Assigned To</th>
-                            <th className="relative px-6 py-2.5"><span className="sr-only">Actions</span></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {group.plans.map((plan) => {
-                            const badge = dueStatusBadge(plan.next_due_date)
-                            return (
-                              <tr key={plan.id} onClick={() => setDetailPlan(plan)} className="hover:bg-blue-100 transition-colors cursor-pointer">
-                                <td className="px-6 py-3">
-                                  <p className="text-sm font-medium text-gray-900">{plan.name}</p>
-                                  {plan.estimated_duration_hours && (
-                                    <p className="text-xs text-gray-500">{plan.estimated_duration_hours}h estimated</p>
-                                  )}
-                                </td>
-                                <td className="px-6 py-3 text-sm text-gray-600 capitalize">
-                                  {plan.frequency.replace('_', ' ')}
-                                </td>
-                                <td className="px-6 py-3">
-                                  <div>
-                                    <p className="text-sm text-gray-700">{formatDate(plan.next_due_date)}</p>
-                                    <Badge className={`mt-1 ${badge.color}`}>{badge.label}</Badge>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-3 text-sm text-gray-600">
-                                  {formatDate(plan.last_performed_date)}
-                                </td>
-                                <td className="px-6 py-3">
-                                  {plan.parts && plan.parts.length > 0 ? (
-                                    <div className="flex items-center gap-1">
-                                      <Package className="h-3.5 w-3.5 text-gray-400" />
-                                      <span className="text-sm text-gray-600">{plan.parts.length}</span>
-                                    </div>
-                                  ) : (
-                                    <span className="text-sm text-gray-400">—</span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-3 text-sm text-gray-600">
-                                  {formatCurrency(plan.estimated_cost)}
-                                </td>
-                                <td className="px-6 py-3">
-                                  <Badge className={statusColor(plan.priority)}>{plan.priority}</Badge>
-                                </td>
-                                <td className="px-6 py-3 text-sm text-gray-600">
-                                  {plan.assigned_to ?? '—'}
-                                </td>
-                                <td className="px-6 py-3 text-right">
-                                  <div className="flex items-center justify-end gap-3" onClick={(e) => e.stopPropagation()}>
-                                    <button
-                                      onClick={() => setLoggingPlan(plan)}
-                                      className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-800"
-                                    >
-                                      <CheckCircle2 className="h-4 w-4" />
-                                      Log
-                                    </button>
-                                    <Link
-                                      href={`/maintenance/${plan.id}/edit`}
-                                      className="text-sm text-blue-600 hover:text-blue-800"
-                                    >
-                                      Edit
-                                    </Link>
-                                  </div>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                      {group.assetId && (
-                        <div className="border-t border-gray-100 px-6 py-2 bg-gray-50">
-                          <Link
-                            href={`/maintenance/new?asset_id=${group.assetId}`}
-                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
-                          >
-                            <Plus className="h-3 w-3" />
-                            Add plan to this asset
-                          </Link>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+                    {isOpen && <div className="space-y-2 px-3 pb-3">{section.assets.map(renderAssetCard)}</div>}
+                  </section>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
       {equipmentAssetId && (() => {
-        const group = assetGroups.find((g) => g.assetId === equipmentAssetId)
+        const group = assetCards.find((g) => g.assetId === equipmentAssetId)
         return (
           <EquipmentDetailModal
             assetId={equipmentAssetId}
@@ -475,7 +646,7 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
             plans={group?.plans ?? []}
             onClose={() => setEquipmentAssetId(null)}
             onOpenPlan={(plan) => setDetailPlan(plan)}
-            onLogPlan={(plan) => setLoggingPlan(plan)}
+            onLogPlan={(plan) => setLoggingPlan(withLatestSteps(plan))}
           />
         )
       })()}
@@ -563,6 +734,15 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
                   <p className="text-sm text-gray-700">{formatCurrency(detailPlan.estimated_cost)}</p>
                 </div>
               </div>
+
+              {/* Steps */}
+              {stepsOf(detailPlan).length > 0 && (
+                <PlanChecklist
+                  planId={detailPlan.id}
+                  steps={stepsOf(detailPlan)}
+                  onChange={(steps) => setChecklistEdits((prev) => ({ ...prev, [detailPlan.id]: steps }))}
+                />
+              )}
 
               {/* Parts Section */}
               {detailPlan.parts && detailPlan.parts.length > 0 && (
@@ -671,7 +851,7 @@ export default function MaintenanceClient({ plans }: MaintenanceClientProps) {
               )}
               <div className="flex gap-3 pt-2 border-t border-gray-100 flex-wrap">
                 <button
-                  onClick={() => { setDetailPlan(null); setLoggingPlan(detailPlan) }}
+                  onClick={() => { setDetailPlan(null); setLoggingPlan(withLatestSteps(detailPlan)) }}
                   className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
                 >
                   <CheckCircle2 className="h-4 w-4" />
