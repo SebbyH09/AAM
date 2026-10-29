@@ -11,6 +11,7 @@ import Link from 'next/link'
 import { addDays } from 'date-fns'
 import DashboardMaintenanceSections from './DashboardMaintenanceSections'
 import DashboardNewItemModal from './DashboardNewItemModal'
+import { activateStartedContracts } from '@/lib/contracts'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +19,8 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const today = new Date().toISOString().split('T')[0]
   const in30Days = addDays(new Date(), 30).toISOString().split('T')[0]
+
+  await activateStartedContracts(supabase)
 
   const [
     { count: totalAssets },

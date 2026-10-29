@@ -159,7 +159,7 @@ export default function RenewContractModal({ contract, onClose, onRenewed }: Ren
           <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-3 text-sm text-blue-700">
             This updates the existing contract in place with the new period and terms, keeping its
             <strong> PM history</strong> and all <strong>service reports</strong>.
-            If the new start date is in the future, the contract will be set to <strong>pending</strong> until it begins.
+            If the new start date is in the future, the contract will be set to <strong>pending</strong> and will automatically become <strong>active</strong> on its start date.
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

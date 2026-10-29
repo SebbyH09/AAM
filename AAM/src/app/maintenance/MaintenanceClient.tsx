@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge, getDueStatus } from '@/lib/utils'
 import Link from 'next/link'
-import { Search, ClipboardList, CheckCircle2, AlertTriangle, Plus, Minus, Clock, MapPin, Package, X, Trash2, Power, Box, Tag, Layers, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
+import { Search, ClipboardList, Pointer, AlertTriangle, Plus, Minus, Clock, MapPin, Package, X, Trash2, Power, Box, Tag, Layers, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
@@ -443,9 +443,9 @@ export default function MaintenanceClient({ plans, groups }: MaintenanceClientPr
                         <div className="flex items-center justify-end gap-3" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => setLoggingPlan(withLatestSteps(plan))}
-                            className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-800"
+                            className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-800 cursor-pointer"
                           >
-                            <CheckCircle2 className="h-4 w-4" />
+                            <Pointer className="h-4 w-4" />
                             Log
                           </button>
                           <Link
@@ -552,9 +552,9 @@ export default function MaintenanceClient({ plans, groups }: MaintenanceClientPr
                     <Badge className={statusColor(plan.priority)}>{plan.priority}</Badge>
                     <button
                       onClick={() => setLoggingPlan(withLatestSteps(plan))}
-                      className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-800"
+                      className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-800 cursor-pointer"
                     >
-                      <CheckCircle2 className="h-4 w-4" />
+                      <Pointer className="h-4 w-4" />
                       Log
                     </button>
                     <Link
@@ -854,7 +854,7 @@ export default function MaintenanceClient({ plans, groups }: MaintenanceClientPr
                   onClick={() => { setDetailPlan(null); setLoggingPlan(withLatestSteps(detailPlan)) }}
                   className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
                 >
-                  <CheckCircle2 className="h-4 w-4" />
+                  <Pointer className="h-4 w-4" />
                   Log Maintenance
                 </button>
                 <button
