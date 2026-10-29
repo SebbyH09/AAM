@@ -5,10 +5,11 @@ import { Badge } from '@/components/ui/Badge'
 import { formatDate, formatCurrency, statusColor, dueStatusBadge } from '@/lib/utils'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Search, FileText, ChevronRight, Paperclip, Wrench, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { Search, FileText, ChevronRight, Paperclip, Wrench, RefreshCw, Sparkles, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { addMonths, parseISO, differenceInDays, format } from 'date-fns'
 import ContractDetailModal from './ContractDetailModal'
+import ContractAlertsModal from './ContractAlertsModal'
 
 interface LinkedAsset {
   asset_id: string
@@ -40,6 +41,7 @@ interface Contract {
   service_contract_assets?: LinkedAsset[]
   renewed_from_contract_id?: string | null
   renewed_at?: string | null
+  activated_at?: string | null
 }
 
 // Contracts renewed within this window are pinned to the top of the list.
@@ -49,6 +51,25 @@ function isRecentlyRenewed(contract: Contract): boolean {
   if (!contract.renewed_at) return false
   return differenceInDays(new Date(), parseISO(contract.renewed_at)) < RECENT_RENEWAL_DAYS
 }
+
+// Pending contracts (e.g. renewals) that auto-activated on their start date within
+// this window are flagged as newly active and pinned alongside recent renewals.
+function isRecentlyActivated(contract: Contract): boolean {
+  if (contract.status !== 'active' || !contract.activated_at) return false
+  return differenceInDays(new Date(), parseISO(contract.activated_at)) < RECENT_RENEWAL_DAYS
+}
+
+// Most recent renewal/activation timestamp within the pin window, or null.
+function pinnedAt(contract: Contract): number | null {
+  const times = [
+    isRecentlyRenewed(contract) ? parseISO(contract.renewed_at!).getTime() : null,
+    isRecentlyActivated(contract) ? parseISO(contract.activated_at!).getTime() : null,
+  ].filter((t): t is number => t !== null)
+  return times.length > 0 ? Math.max(...times) : null
+}
+
+// Active contracts ending within this many days show in the alerts pop-up.
+const EXPIRING_SOON_DAYS = 30
 
 function getLinkedAssetNames(contract: Contract): string {
   const linked = contract.service_contract_assets?.filter((la) => la.assets) ?? []
@@ -159,6 +180,22 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
   const [sortField, setSortField] = useState<SortField>('expiry')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
+  const alerts = useMemo(() => {
+    const byStart = (a: Contract, b: Contract) => a.start_date.localeCompare(b.start_date)
+    const byEnd = (a: Contract, b: Contract) => a.end_date.localeCompare(b.end_date)
+    return {
+      newlyActive: contracts.filter(isRecentlyActivated).sort(byStart),
+      pending: contracts.filter((c) => c.status === 'pending').sort(byStart),
+      expiring: contracts
+        .filter((c) => c.status === 'active' && differenceInDays(parseISO(c.end_date), new Date()) <= EXPIRING_SOON_DAYS)
+        .sort(byEnd),
+    }
+  }, [contracts])
+  // Pop up the alerts once when the page loads, if there is anything to show.
+  const [showAlerts, setShowAlerts] = useState(
+    () => alerts.newlyActive.length + alerts.pending.length + alerts.expiring.length > 0
+  )
+
   const filtered = contracts.filter((c) => {
     const q = search.toLowerCase()
     const assetNames = getLinkedAssetNames(c).toLowerCase()
@@ -173,17 +210,15 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
     return matchSearch && matchStatus
   })
 
-  // Pin contracts renewed within the last 7 days to the top (most recently renewed
-  // first); everything else is ordered by the selected sort column.
+  // Pin contracts renewed or auto-activated within the last 7 days to the top (most
+  // recent first); everything else is ordered by the selected sort column.
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
-      const aRenewed = isRecentlyRenewed(a)
-      const bRenewed = isRecentlyRenewed(b)
-      if (aRenewed && bRenewed) {
-        return parseISO(b.renewed_at!).getTime() - parseISO(a.renewed_at!).getTime()
-      }
-      if (aRenewed) return -1
-      if (bRenewed) return 1
+      const aPinned = pinnedAt(a)
+      const bPinned = pinnedAt(b)
+      if (aPinned !== null && bPinned !== null) return bPinned - aPinned
+      if (aPinned !== null) return -1
+      if (bPinned !== null) return 1
       const cmp = compareContracts(a, b, sortField)
       return sortDir === 'asc' ? cmp : -cmp
     })
@@ -358,6 +393,12 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
                             Renewed
                           </Badge>
                         )}
+                        {isRecentlyActivated(contract) && (
+                          <Badge className="bg-green-100 text-green-700 text-[10px] flex items-center gap-0.5 w-fit">
+                            <Sparkles className="h-2.5 w-2.5" />
+                            New active
+                          </Badge>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
@@ -374,6 +415,16 @@ export default function ContractsClient({ contracts }: ContractsClientProps) {
             </tbody>
           </table>
         </div>
+      )}
+      {showAlerts && (
+        <ContractAlertsModal
+          newlyActive={alerts.newlyActive}
+          pending={alerts.pending}
+          expiring={alerts.expiring}
+          getAssetNames={getLinkedAssetNames}
+          onSelect={(c) => { setShowAlerts(false); setSelectedContract(c) }}
+          onClose={() => setShowAlerts(false)}
+        />
       )}
       {selectedContract && (
         <ContractDetailModal
