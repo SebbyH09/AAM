@@ -19,6 +19,9 @@ export default async function ReportsPage() {
     { data: assets },
     { data: parts },
     { data: maintenancePlans },
+    { data: workOrders },
+    { data: instrumentMaintenance },
+    { data: contracts },
   ] = await Promise.all([
     supabase
       .from('maintenance_records')
@@ -27,7 +30,7 @@ export default async function ReportsPage() {
       .order('performed_date'),
     supabase
       .from('repairs')
-      .select('id, status, started_date, completed_date, total_cost, reported_date')
+      .select('id, asset_id, status, started_date, completed_date, total_cost, reported_date')
       .order('reported_date', { ascending: false }),
     supabase
       .from('downtime_events')
@@ -35,7 +38,7 @@ export default async function ReportsPage() {
       .not('end_time', 'is', null),
     supabase
       .from('assets')
-      .select('id, status, category'),
+      .select('id, name, asset_tag, status, category'),
     supabase
       .from('parts')
       .select('id, name, quantity_on_hand, reorder_point, unit_cost'),
@@ -43,6 +46,16 @@ export default async function ReportsPage() {
       .from('maintenance_plans')
       .select('id, is_active, next_due_date')
       .eq('is_active', true),
+    supabase
+      .from('work_orders')
+      .select('id, asset_id, status, cost, request_date, completed_date')
+      .neq('status', 'cancelled'),
+    supabase
+      .from('maintenance_records')
+      .select('id, asset_id, performed_date, cost, status'),
+    supabase
+      .from('service_contracts')
+      .select('id, asset_id, cost, start_date, service_contract_assets(asset_id)'),
   ])
 
   return (
@@ -65,6 +78,9 @@ export default async function ReportsPage() {
           assets={(assets ?? []) as any}
           parts={(parts ?? []) as any}
           maintenancePlans={(maintenancePlans ?? []) as any}
+          workOrders={(workOrders ?? []) as any}
+          instrumentMaintenance={(instrumentMaintenance ?? []) as any}
+          contracts={(contracts ?? []) as any}
           startOfYear={startOfYear}
         />
       </div>

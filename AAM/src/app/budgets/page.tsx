@@ -28,6 +28,7 @@ export default async function BudgetsPage() {
     { data: maintenanceData },
     { data: repairsData },
     { data: contractsData },
+    { data: workOrdersData },
   ] = await Promise.all([
     supabase
       .from('budgets')
@@ -42,6 +43,10 @@ export default async function BudgetsPage() {
     supabase
       .from('service_contracts')
       .select('id, asset_id, cost, start_date, end_date, status, vendor_name, contract_type, assets(id, name, asset_tag)'),
+    supabase
+      .from('work_orders')
+      .select('id, asset_id, title, cost, request_date, completed_date, status, vendor, assets(id, name, asset_tag)')
+      .neq('status', 'cancelled'),
   ])
 
   const spendingRecords: SpendingRecord[] = [
@@ -78,6 +83,21 @@ export default async function BudgetsPage() {
       vendor: null,
       fiscal_year: parseInt((r.reported_date as string).substring(0, 4)),
     })),
+    ...(workOrdersData ?? []).map((w) => {
+      // Count the spend when the work was done; fall back to when it was requested.
+      const date = ((w.completed_date as string | null) ?? (w.request_date as string))
+      return {
+        id: w.id,
+        category: 'work_orders' as const,
+        description: w.title as string,
+        asset_name: extractAssetName(w.assets),
+        amount: (w.cost as number | null) ?? 0,
+        date,
+        status: w.status as string,
+        vendor: (w.vendor as string | null) ?? null,
+        fiscal_year: parseInt(date.substring(0, 4)),
+      }
+    }),
   ]
 
   const currentYearBudgets = budgets?.filter((b) => b.fiscal_year === currentYear) ?? []
@@ -121,7 +141,7 @@ export default async function BudgetsPage() {
           <StatCard
             title={`${currentYear} Spent`}
             value={formatCurrency(currentYearSpend)}
-            subtitle="Contracts + maintenance + repairs"
+            subtitle="Contracts + maintenance + repairs + work orders"
             icon={<DollarSign className="h-6 w-6" />}
             color={currentYearSpend > totalPlanned ? 'red' : 'yellow'}
           />

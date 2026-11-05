@@ -8,6 +8,9 @@ import {
   BarChart3, Wrench, Clock, Package2, ClipboardList,
   TrendingUp, AlertTriangle, CheckCircle
 } from 'lucide-react'
+import InstrumentReports, {
+  InstrumentContract, InstrumentMaintenanceRecord, InstrumentWorkOrder,
+} from './InstrumentReports'
 
 interface MaintenanceRecord {
   id: string
@@ -19,6 +22,7 @@ interface MaintenanceRecord {
 
 interface Repair {
   id: string
+  asset_id: string | null
   status: string
   started_date: string | null
   completed_date: string | null
@@ -36,6 +40,8 @@ interface DowntimeEvent {
 
 interface Asset {
   id: string
+  name: string
+  asset_tag: string | null
   status: string
   category: string | null
 }
@@ -61,10 +67,13 @@ interface ReportsClientProps {
   assets: Asset[]
   parts: Part[]
   maintenancePlans: MaintenancePlan[]
+  workOrders: InstrumentWorkOrder[]
+  instrumentMaintenance: InstrumentMaintenanceRecord[]
+  contracts: InstrumentContract[]
   startOfYear: string
 }
 
-const TABS = ['Overview', 'Maintenance', 'Repairs', 'Downtime', 'Inventory'] as const
+const TABS = ['Overview', 'Instruments', 'Maintenance', 'Repairs', 'Downtime', 'Inventory'] as const
 type Tab = typeof TABS[number]
 
 function HorizontalBar({ label, value, maxValue, color = 'bg-blue-500' }: {
@@ -113,6 +122,9 @@ export default function ReportsClient({
   assets,
   parts,
   maintenancePlans,
+  workOrders,
+  instrumentMaintenance,
+  contracts,
   startOfYear,
 }: ReportsClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>('Overview')
@@ -162,6 +174,9 @@ export default function ReportsClient({
   const ytdRepairCost = repairs
     .filter((r) => r.reported_date >= startOfYear)
     .reduce((sum, r) => sum + (r.total_cost ?? 0), 0)
+
+  const ytdWorkOrders = workOrders.filter((w) => (w.completed_date ?? w.request_date) >= startOfYear)
+  const ytdWorkOrderCost = ytdWorkOrders.reduce((sum, w) => sum + (w.cost ?? 0), 0)
 
   const repairsByStatus = useMemo(() => {
     const map: Record<string, number> = {}
@@ -226,12 +241,12 @@ export default function ReportsClient({
     <div className="space-y-6">
       {/* Tabs */}
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex gap-6">
+        <nav className="-mb-px flex gap-6 overflow-x-auto">
           {TABS.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`pb-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 activeTab === tab
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -246,7 +261,7 @@ export default function ReportsClient({
       {/* Overview Tab */}
       {activeTab === 'Overview' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <StatCard
               title="Maintenance Cost YTD"
               value={formatCurrency(ytdMaintenanceCost)}
@@ -260,6 +275,13 @@ export default function ReportsClient({
               subtitle="Year to date"
               icon={<Wrench className="h-6 w-6" />}
               color="orange"
+            />
+            <StatCard
+              title="Work Order Cost YTD"
+              value={formatCurrency(ytdWorkOrderCost)}
+              subtitle={`${ytdWorkOrders.length} work order(s)`}
+              icon={<ClipboardList className="h-6 w-6" />}
+              color="yellow"
             />
             <StatCard
               title="PM Compliance"
@@ -294,6 +316,17 @@ export default function ReportsClient({
         </div>
       )}
 
+      {/* Instruments Tab */}
+      {activeTab === 'Instruments' && (
+        <InstrumentReports
+          assets={assets}
+          maintenanceRecords={instrumentMaintenance}
+          repairs={repairs}
+          workOrders={workOrders}
+          contracts={contracts}
+        />
+      )}
+
       {/* Maintenance Tab */}
       {activeTab === 'Maintenance' && (
         <div className="space-y-6">
@@ -303,7 +336,7 @@ export default function ReportsClient({
               value={maintenanceRecords.length}
               subtitle="Last 12 months"
               icon={<ClipboardList className="h-6 w-6" />}
-              color="blue"
+              color="yellow"
             />
             <StatCard
               title="PM Compliance"

@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 import Link from 'next/link'
-import { Search, DollarSign, BarChart3, Table2, FileText, Wrench, ShieldCheck } from 'lucide-react'
+import { Search, DollarSign, BarChart3, Table2, FileText, Wrench, ShieldCheck, ClipboardList } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface Asset {
@@ -27,7 +27,7 @@ interface Budget {
 
 export interface SpendingRecord {
   id: string
-  category: 'contracts' | 'maintenance' | 'repairs'
+  category: 'contracts' | 'maintenance' | 'repairs' | 'work_orders'
   description: string
   asset_name: string | null
   amount: number
@@ -83,6 +83,16 @@ const SPENDING_CATEGORIES = [
     textColor: 'text-orange-700',
     icon: FileText,
   },
+  {
+    key: 'work_orders' as const,
+    label: 'Other Work Orders',
+    budgetType: null,
+    barColor: 'bg-teal-500',
+    bgColor: 'bg-teal-50',
+    borderColor: 'border-teal-200',
+    textColor: 'text-teal-700',
+    icon: ClipboardList,
+  },
 ]
 
 const STATUS_COLORS: Record<string, string> = {
@@ -95,6 +105,7 @@ const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
   in_progress: 'bg-yellow-100 text-yellow-800',
   waiting_parts: 'bg-orange-100 text-orange-800',
+  on_hold: 'bg-gray-100 text-gray-800',
   cancelled: 'bg-gray-100 text-gray-800',
 }
 
@@ -256,7 +267,7 @@ export default function BudgetsClient({ budgets, spendingRecords }: BudgetsClien
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <div className="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-2 lg:grid-cols-4 sm:divide-x sm:divide-y-0">
           {spendingAnalysis.map((cat) => {
             const Icon = cat.icon
             const over = cat.planned != null && cat.actual > cat.planned
@@ -455,6 +466,7 @@ export default function BudgetsClient({ budgets, spendingRecords }: BudgetsClien
               <option value="contracts">Service Contracts</option>
               <option value="maintenance">Maintenance</option>
               <option value="repairs">Repairs</option>
+              <option value="work_orders">Other Work Orders</option>
             </select>
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
